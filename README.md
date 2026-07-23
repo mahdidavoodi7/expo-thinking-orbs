@@ -10,6 +10,15 @@ Native and Expo.
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android-lightgrey.svg)
 
+## 🙏 Credit
+>
+> This is a React Native port of **[thinking-orbs](https://github.com/Jakubantalik/thinking-orbs)**
+> by **[Jakub Antalik](https://github.com/Jakubantalik)** — see the original
+> web library and its live demo at **[orbs.jakubantalik.com](https://orbs.jakubantalik.com)**.
+> All of the animation design and the per‑frame engine math are his; this package
+> re‑implements that engine on the UI thread for React Native. Original
+> library MIT © Jakub Antalik.
+
 ## 🎬 Preview
 
 <!--
@@ -21,18 +30,6 @@ Native and Expo.
 
 ![expo-thinking-orbs — gallery of shimmering orb pills and the playground, on iOS and Android](docs/demo.gif)
 
-> ### 🙏 Credit
->
-> This is a React Native port of **[thinking-orbs](https://github.com/Jakubantalik/thinking-orbs)**
-> by **[Jakub Antalik](https://github.com/Jakubantalik)** — see the original
-> web library and its live demo at **[orbs.jakubantalik.com](https://orbs.jakubantalik.com)**.
-> All of the animation design and the per‑frame engine math are his; this package
-> re‑implements that engine on the UI thread for React Native. Original
-> library MIT © Jakub Antalik.
-
-<p align="center">
-  <img width="480" height="480" alt="Image" src="https://github.com/user-attachments/assets/ff9d70bb-30ab-400e-87fd-8803218d0887" />
-</p>
 
 | state | verb | animation |
 | --- | --- | --- |
