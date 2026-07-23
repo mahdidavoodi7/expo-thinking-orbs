@@ -56,14 +56,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mahdidavoodi/expo-thinking-orbs.git"
+    "url": "git+https://github.com/mahdidavoodi7/expo-thinking-orbs.git"
   },
   "author": "Mehdi Davoodi <mahdidavoodi7@gmail.com> (https://motionary.dev)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/mahdidavoodi/expo-thinking-orbs/issues"
+    "url": "https://github.com/mahdidavoodi7/expo-thinking-orbs/issues"
   },
-  "homepage": "https://github.com/mahdidavoodi/expo-thinking-orbs#readme",
+  "homepage": "https://github.com/mahdidavoodi7/expo-thinking-orbs#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

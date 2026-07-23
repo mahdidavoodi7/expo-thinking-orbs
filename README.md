@@ -19,7 +19,7 @@ Native and Expo.
   line (keep the GIF too — npm renders no video, only images).
 -->
 
-![expo-thinking-orbs — gallery of shimmering orb pills and the playground, on iOS and Android](https://raw.githubusercontent.com/mahdidavoodi/expo-thinking-orbs/main/docs/demo.gif)
+![expo-thinking-orbs — gallery of shimmering orb pills and the playground, on iOS and Android](docs/demo.gif)
 
 > ### 🙏 Credit
 >
