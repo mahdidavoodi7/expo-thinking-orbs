@@ -5,6 +5,10 @@
 // rendered on the UI thread with Skia + Reanimated.
 
 export { ThinkingOrb, default } from './ThinkingOrb';
+export {
+  useThinkingOrbPicture,
+  type UseThinkingOrbPictureOptions,
+} from './useThinkingOrbPicture';
 
 export type { ThinkingOrbProps, OrbState, OrbSize, OrbTheme } from './types';
 

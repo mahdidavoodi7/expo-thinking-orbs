@@ -42,10 +42,10 @@ const COLOR_OPTS: SegmentedOption<string>[] = [
 
 export function PlaygroundScreen({ dark: appDark }: { dark: boolean }) {
   const scheme = useColorScheme();
-  const [state, setState] = useState<OrbState>('searching');
+  const [state, setState] = useState<OrbState>('working');
   const [theme, setTheme] = useState<OrbTheme>('auto');
   const [colorVal, setColorVal] = useState<string>('none');
-  const [size, setSize] = useState(64);
+  const [size, setSize] = useState(120);
   const [speed, setSpeed] = useState(1);
   const [paused, setPaused] = useState(false);
 

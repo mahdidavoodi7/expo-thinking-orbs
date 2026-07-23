@@ -19,11 +19,11 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const TOP_INSET =
-  Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 24) : 52;
+  Platform.OS === 'android' ? (RNStatusBar.currentHeight ?? 24) : 72;
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('gallery');
-  const [dark, setDark] = useState(true);
+  const dark = true;
 
   const bg = dark ? '#0b0b0c' : '#ffffff';
   const fg = dark ? '#fafafa' : '#0b0b0c';
@@ -34,7 +34,7 @@ export default function App() {
   return (
     <View style={[styles.root, { backgroundColor: bg, paddingTop: TOP_INSET }]}>
       <StatusBar style={dark ? 'light' : 'dark'} />
-
+      {/* 
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { color: fg }]}>expo-thinking-orbs</Text>
@@ -50,7 +50,7 @@ export default function App() {
         >
           <Text style={styles.themeIcon}>{dark ? '☀️' : '🌙'}</Text>
         </Pressable>
-      </View>
+      </View> */}
 
       <View style={[styles.tabbar, { borderColor: border }]}>
         {TABS.map(({ key, label }) => {

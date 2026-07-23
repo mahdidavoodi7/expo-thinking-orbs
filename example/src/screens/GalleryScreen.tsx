@@ -6,8 +6,8 @@
 // design; everything else runs the 64 design (any orb size ≥ 36 picks
 // it), scaled down to fit the phone-width columns.
 import { StyleSheet, View } from 'react-native';
-import { ThinkingOrb, type OrbState } from 'expo-thinking-orbs';
-import { ShimmerText } from '../components/ShimmerText';
+import { type OrbState } from 'expo-thinking-orbs';
+import { OrbPill } from '../components/OrbPill';
 
 interface Entry {
   state: OrbState;
@@ -33,7 +33,6 @@ const RIGHT: Entry[] = [
 ];
 
 export function GalleryScreen({ dark }: { dark: boolean }) {
-  const theme = dark ? 'dark' : 'light';
   // --hero-surface / --pill-fill / pill ring, from the original styles.css
   const surface = dark ? 'rgba(217,217,217,0.035)' : 'rgba(0,0,0,0.028)';
   const pillFill = dark ? 'rgba(29,29,29,0.42)' : 'rgba(255,255,255,0.6)';
@@ -50,8 +49,14 @@ export function GalleryScreen({ dark }: { dark: boolean }) {
           { backgroundColor: pillFill, borderColor: pillRing },
         ]}
       >
-        <ThinkingOrb state={state} size={large ? 40 : 20} theme={theme} />
-        <ShimmerText text={label} fontSize={large ? 15 : 11} dark={dark} />
+        <OrbPill
+          state={state}
+          label={label}
+          orbSize={large ? 40 : 20}
+          fontSize={large ? 15 : 11}
+          gap={large ? 8 : 7}
+          dark={dark}
+        />
       </View>
     </View>
   );

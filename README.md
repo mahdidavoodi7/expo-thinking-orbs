@@ -131,6 +131,36 @@ Omit `color` for the faithful grayscale original. 🖤🤍
 
 `OrbState` is `'working' | 'searching' | 'solving' | 'listening' | 'composing' | 'shaping'`.
 
+## 🤖 Many orbs? Share one canvas
+
+Every `<ThinkingOrb>` mounts its own Skia `<Canvas>`, and each canvas is a
+separate native surface — on Android each one is composited every frame, so
+a screen full of small animating canvases drops UI frames on mid‑range
+devices. For those screens, use the `useThinkingOrbPicture` hook and draw
+several orbs (plus any other animated Skia content) into **one** canvas:
+
+```tsx
+import { Canvas, Group, Picture } from '@shopify/react-native-skia';
+import { useThinkingOrbPicture } from 'expo-thinking-orbs';
+
+function StatusRow() {
+  const working = useThinkingOrbPicture({ state: 'working', size: 40 });
+  const searching = useThinkingOrbPicture({ state: 'searching', size: 40 });
+  return (
+    <Canvas style={{ width: 96, height: 40 }}>
+      <Picture picture={working} />
+      <Group transform={[{ translateX: 56 }]}>
+        <Picture picture={searching} />
+      </Group>
+    </Canvas>
+  );
+}
+```
+
+The picture is recorded at `(0, 0, size, size)`; offset it with a
+`<Group transform>`. The example app's gallery draws each pill (orb +
+shimmering label) this way.
+
 ## 🧠 How it works
 
 The original thinking-orbs is **not** shader‑based: each state is pure CPU math
