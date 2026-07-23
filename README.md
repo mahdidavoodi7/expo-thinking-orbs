@@ -19,6 +19,10 @@ Native and Expo.
 > re‑implements that engine on the UI thread for React Native. Original
 > library MIT © Jakub Antalik.
 
+<p align="center">
+  <img width="480" height="480" alt="Image" src="https://github.com/user-attachments/assets/ff9d70bb-30ab-400e-87fd-8803218d0887" />
+</p>
+
 | state | verb | animation |
 | --- | --- | --- |
 | 🪐 `working` | thinking | particles on tilted orbits |
