@@ -4,24 +4,30 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "build:ios": "xcodebuild ONLY_ACTIVE_ARCH=YES -workspace ios/ExpoThinkingOrbsExample.xcworkspace -UseNewBuildSystem=YES -scheme ExpoThinkingOrbsExample -configuration Debug -sdk iphonesimulator -derivedDataPath ios/build -quiet",
     "build:android": "cd android && ./gradlew assembleDebug -DtestBuildType=debug -Dorg.gradle.jvmargs=-Xmx4g",
     "build:web": "expo export --platform web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~55.0.12",
-    "expo": "~55.0.28",
-    "expo-status-bar": "~55.0.6",
+    "@expo/metro-runtime": "~56.0.18",
+    "@react-native-community/slider": "5.2.0",
+    "@shopify/react-native-skia": "2.6.2",
+    "expo": "~56.0.17",
+    "expo-status-bar": "~56.0.4",
+    "expo-thinking-orbs": "link:..",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "react-native": "0.83.10",
-    "react-native-web": "~0.21.0"
+    "react-native": "0.85.3",
+    "react-native-reanimated": "4.3.1",
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.8.3"
   },
   "private": true,
   "devDependencies": {
+    "fsevents": "^2.3.3",
     "react-native-builder-bob": "^0.41.0",
     "react-native-monorepo-config": "^0.4.0"
   }

@@ -1,31 +1,31 @@
 {
   "name": "expo-thinking-orbs",
   "version": "0.1.0",
-  "description": "Dotted thinking-orb loading animations for AI & agent UIs — six tuned states, Skia + Reanimated, for React Native & Expo",
-  "main": "./lib/module/index.js",
-  "types": "./lib/typescript/src/index.d.ts",
+  "description": "Dotted thinking-orb loading animations for AI & agent UIs — six tuned states, rendered on the UI thread with Skia + Reanimated, for React Native & Expo",
+  "main": "./lib/commonjs/index.js",
+  "module": "./lib/module/index.js",
+  "types": "./lib/typescript/commonjs/src/index.d.ts",
   "exports": {
     ".": {
       "expo-thinking-orbs-source": "./src/index.tsx",
-      "types": "./lib/typescript/src/index.d.ts",
+      "import": {
+        "types": "./lib/typescript/module/src/index.d.ts",
+        "default": "./lib/module/index.js"
+      },
+      "require": {
+        "types": "./lib/typescript/commonjs/src/index.d.ts",
+        "default": "./lib/commonjs/index.js"
+      },
       "default": "./lib/module/index.js"
     },
     "./package.json": "./package.json"
   },
+  "sideEffects": false,
   "files": [
     "src",
     "lib",
-    "android",
-    "ios",
-    "cpp",
-    "*.podspec",
-    "react-native.config.js",
-    "!ios/build",
-    "!android/build",
-    "!android/gradle",
-    "!android/gradlew",
-    "!android/gradlew.bat",
-    "!android/local.properties",
+    "LICENSE",
+    "README.md",
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
@@ -40,14 +40,25 @@
   },
   "keywords": [
     "react-native",
-    "ios",
-    "android"
+    "expo",
+    "skia",
+    "reanimated",
+    "loader",
+    "loading",
+    "spinner",
+    "animation",
+    "ai",
+    "agent",
+    "llm",
+    "thinking",
+    "orb",
+    "dots"
   ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mahdidavoodi/expo-thinking-orbs.git"
   },
-  "author": "Mehdi <mahdidavoodi7@gmail.com> (https://github.com/mahdidavoodi)",
+  "author": "Mehdi Davoodi <mahdidavoodi7@gmail.com> (https://motionary.dev)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/mahdidavoodi/expo-thinking-orbs/issues"
@@ -62,6 +73,7 @@
     "@eslint/js": "^10.0.1",
     "@react-native/babel-preset": "0.85.0",
     "@react-native/eslint-config": "0.85.0",
+    "@shopify/react-native-skia": "2.6.2",
     "@types/react": "^19.2.0",
     "del-cli": "^7.0.0",
     "eslint": "^9.39.4",
@@ -70,14 +82,19 @@
     "eslint-plugin-prettier": "^5.5.6",
     "prettier": "^3.8.3",
     "react": "19.2.0",
-    "react-native": "0.83.10",
+    "react-native": "0.85.3",
     "react-native-builder-bob": "^0.41.0",
+    "react-native-reanimated": "4.3.1",
+    "react-native-worklets": "0.8.3",
     "turbo": "^2.9.16",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
-    "react": "*",
-    "react-native": "*"
+    "@shopify/react-native-skia": ">=2.0.0",
+    "react": ">=19",
+    "react-native": ">=0.79",
+    "react-native-reanimated": ">=4.0.0",
+    "react-native-worklets": ">=0.7.0"
   },
   "workspaces": [
     "example"
@@ -87,6 +104,12 @@
     "source": "src",
     "output": "lib",
     "targets": [
+      [
+        "commonjs",
+        {
+          "esm": true
+        }
+      ],
       [
         "module",
         {
