@@ -10,6 +10,17 @@ Native and Expo.
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android-lightgrey.svg)
 
+## 🎬 Preview
+
+<!--
+  GitHub inline video player: edit this file on github.com, drag
+  docs/preview.mp4 into the editor, then replace the image below with the
+  generated https://github.com/user-attachments/assets/… URL on its own
+  line (keep the GIF too — npm renders no video, only images).
+-->
+
+![expo-thinking-orbs — gallery of shimmering orb pills and the playground, on iOS and Android](https://raw.githubusercontent.com/mahdidavoodi/expo-thinking-orbs/main/docs/demo.gif)
+
 > ### 🙏 Credit
 >
 > This is a React Native port of **[thinking-orbs](https://github.com/Jakubantalik/thinking-orbs)**
