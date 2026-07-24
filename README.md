@@ -67,6 +67,10 @@ Babel plugin — `babel-preset-expo` adds it automatically on Expo).
 
 </details>
 
+> **Note:** Reanimated 4 requires the **New Architecture** — the default since
+> React Native 0.76 / Expo SDK 52. Old‑architecture apps can't use this
+> library until they migrate.
+
 ## 🚀 Quick start
 
 ```tsx
