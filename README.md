@@ -21,14 +21,16 @@ Native and Expo.
 
 ## 🎬 Preview
 
+https://github.com/user-attachments/assets/f269ab22-ffab-4e1c-a525-c811e5236a9c
+
 <!--
   GitHub inline video player: edit this file on github.com, drag
   docs/preview.mp4 into the editor, then replace the image below with the
   generated https://github.com/user-attachments/assets/… URL on its own
   line (keep the GIF too — npm renders no video, only images).
+![expo-thinking-orbs — gallery of shimmering orb pills and the playground, on iOS and Android](docs/demo.gif)
 -->
 
-![expo-thinking-orbs — gallery of shimmering orb pills and the playground, on iOS and Android](docs/demo.gif)
 
 
 | state | verb | animation |
