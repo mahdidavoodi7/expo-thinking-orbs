@@ -12,18 +12,20 @@
     "build:web": "expo export --platform web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~56.0.18",
+    "@expo/metro-runtime": "~57.0.7",
     "@react-native-community/slider": "5.2.0",
     "@shopify/react-native-skia": "2.6.2",
-    "expo": "~56.0.17",
-    "expo-status-bar": "~56.0.4",
+    "expo": "~57.0.8",
+    "expo-splash-screen": "~57.0.5",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.1",
     "expo-thinking-orbs": "link:..",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "react-native": "0.85.3",
-    "react-native-reanimated": "4.3.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-reanimated": "4.5.0",
     "react-native-web": "~0.21.0",
-    "react-native-worklets": "0.8.3"
+    "react-native-worklets": "0.10.0"
   },
   "private": true,
   "devDependencies": {

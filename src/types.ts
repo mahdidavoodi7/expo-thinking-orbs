@@ -11,6 +11,12 @@ import type { SharedValue } from 'react-native-reanimated';
  * - `listening` — a waveform rolls through latitude rings
  * - `composing` — an undulating multi-band sash
  * - `shaping`   — a dotted outline morphs circle → triangle → square
+ *
+ * Voice agents have their own vocabulary and their own animation — see
+ * {@linkcode VoiceOrb} and `VoiceOrbState`. They are deliberately a
+ * separate axis: `listening` means something different to a voice agent
+ * than it does here, and these six are a faithful port that should not
+ * shift under anyone.
  */
 export type OrbState =
   'working' | 'searching' | 'solving' | 'listening' | 'composing' | 'shaping';

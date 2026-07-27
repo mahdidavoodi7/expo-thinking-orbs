@@ -1,7 +1,8 @@
 # ✨ expo-thinking-orbs
 
-Dotted thinking‑orb loading indicators for AI & agent UIs — six hand‑tuned
-animated states, rendered entirely on the UI thread with
+Dotted thinking‑orb loading indicators for AI & agent UIs — ten hand‑tuned
+animated states, a voice‑agent component that swells with the audio, all
+rendered entirely on the UI thread with
 [React Native Skia](https://shopify.github.io/react-native-skia/) and
 [Reanimated](https://docs.swmansion.com/react-native-reanimated/). For React
 Native and Expo.
@@ -41,6 +42,10 @@ https://github.com/user-attachments/assets/f269ab22-ffab-4e1c-a525-c811e5236a9c
 | 🎧 `listening` | hearing | a waveform rolls through latitude rings |
 | 🎼 `composing` | writing | an undulating multi‑band sash |
 | 🔷 `shaping` | forming | a dotted outline morphs circle → triangle → square |
+
+Building a **voice agent**? There is a seventh animation for that — a dot
+shell with five behaviours, on its own component. See
+[Voice agents](#-voice-agents).
 
 ## 📦 Installation
 
@@ -149,6 +154,114 @@ Omit `color` for the faithful grayscale original. 🖤🤍
 
 `OrbState` is `'working' | 'searching' | 'solving' | 'listening' | 'composing' | 'shaping'`.
 
+## 🎙️ Voice agents
+
+`<VoiceOrb>` is a wrapper that takes a voice agent's lifecycle state and its
+two audio levels, and does the routing for you. Its state union is LiveKit's
+[`AgentState`](https://docs.livekit.io/reference/agents-js/types/agents.voice.AgentState.html)
+verbatim, so a session state passes straight through with no mapping table:
+
+```tsx
+import { VoiceOrb } from 'expo-thinking-orbs';
+
+function AgentAvatar() {
+  const { state } = useVoiceAssistant(); // '@livekit/components-react'
+  return (
+    <VoiceOrb
+      state={state}
+      inputAmplitude={micLevel}      // SharedValue<number>, 0–1
+      outputAmplitude={agentLevel}   // SharedValue<number>, 0–1
+      size={140}
+    />
+  );
+}
+```
+
+Using another SDK? The union is nine plain strings — map yours onto them, or
+reach for `<ThinkingOrb>` and the four lifecycle states directly.
+
+**The seven behaviours**
+
+All seven act on one shared dot shell — a latitude-ring lattice, the same
+structure `wave` and `globe` use — at the same tempo and scale as the ported
+animations. Because the dot set is shared, a state change **blends**: the dots
+travel to their new behaviour over ~420 ms instead of cutting.
+
+| state | behaviour |
+| --- | --- |
+| `disconnected` | dim, drawn in, near-motionless; a faint ping crawls across and finds nothing |
+| `connecting` | fast spikes and hard shear, but faint — straining, not yet through |
+| `pre-connect-buffering` | a bright band sweeps pole to pole and back; fuller than `connecting` |
+| `initializing` | scattered dots assemble onto the shell in a rolling wave |
+| `idle` | the undulation at half tempo and a quarter depth — at rest, breathing |
+| `listening` | wavefronts **converge inward**, carrying dots toward the core with the mic |
+| `thinking` | `wave`'s undulation at a narrower swing — the calm middle of a turn |
+| `speaking` | wavefronts **expand outward**, carrying dots to the rim with the agent's voice |
+
+These are staged so progress is legible without reading a label — each step
+along `disconnected → connecting → buffering → initializing → idle` is
+measurably fuller and brighter than the last. `failed` freezes the shell;
+`disconnected` keeps running, because straining for a signal is the point of
+it.
+
+### Feeding it real audio
+
+This package renders; it does not capture audio. `useVoiceAmplitude()` is the
+bridge — it owns a `SharedValue` the orb reads every frame, and converts the
+formats you are actually likely to have. Setting it never re-renders React.
+
+```tsx
+import { VoiceOrb, useVoiceAmplitude } from 'expo-thinking-orbs';
+
+function AgentAvatar() {
+  const { state } = useVoiceAssistant();
+  const mic = useVoiceAmplitude();
+  const agent = useVoiceAmplitude();
+
+  return (
+    <VoiceOrb
+      state={state}
+      inputAmplitude={mic.level}
+      outputAmplitude={agent.level}
+      size={180}
+    />
+  );
+}
+```
+
+Then push levels in from whichever source you have:
+
+| your source | call |
+| --- | --- |
+| already `0`–`1` (LiveKit `useTrackVolume`, a VU meter) | `mic.set(v)` |
+| dBFS (`expo-audio` metering, `expo-av`, `AVAudioRecorder`) | `mic.setDb(db)` |
+| raw PCM frames in `-1..1` (a Gemini Live / Realtime stream) | `agent.setSamples(frames)` |
+
+`setDb` treats −45 dBFS as silence and 0 dB as full, on an ear-shaped curve —
+conversational speech (≈ −20 dB) lands around 0.66 and close talking (≈ −6 dB)
+around 0.90, so the orb's range is spent on speech rather than on room noise.
+Both the floor and the curve are options if your source runs hotter or
+quieter. `setSamples` takes the RMS of the block.
+
+A stalled meter handing you `NaN` reads as silence rather than corrupting the
+geometry.
+
+### How amplitude behaves
+
+Audio level scales how **deep** a gesture goes, never how **fast**. The tempo
+is fixed at the ported animations' pace — driving the rate from amplitude is
+frequency modulation, and reads as vibration rather than as a voice. The
+wavefronts travel through screen-space radius, so every dot the same distance
+from the centre moves together and the shell stays a surface.
+
+Levels are clamped and smoothed on the UI thread with a fast attack (45 ms)
+and slow release (240 ms), so feed a raw meter — pre-smoothing on top will
+only make the orb lag the voice.
+
+Amplitude is **ignored** when the OS reduce-motion setting is on, and frozen
+while `paused`. The six ported animations have no audio response by design;
+`amplitude` only reaches the voice shell.
+
 ## 🤖 Many orbs? Share one canvas
 
 Every `<ThinkingOrb>` mounts its own Skia `<Canvas>`, and each canvas is a
@@ -212,9 +325,11 @@ precomputed once per resolved preset on the JS thread.
 
 ## 📱 Running the example app
 
-The `example/` app is an Expo SDK 56 project with two screens — a gallery of
-all six states as shimmering status pills (both tuned designs), and a
-playground with live state/theme/color/size/speed controls.
+The `example/` app is an Expo SDK 57 project with three screens — a gallery of
+states as shimmering status pills (both tuned designs), a playground with live
+state/theme/color/size/speed/amplitude controls, and a voice screen that runs
+`<VoiceOrb>` through a full agent lifecycle against a synthesised speech
+envelope.
 
 ```sh
 yarn                       # install (from the repo root)

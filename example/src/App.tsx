@@ -10,12 +10,14 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { GalleryScreen } from './screens/GalleryScreen';
 import { PlaygroundScreen } from './screens/PlaygroundScreen';
+import { VoiceScreen } from './screens/VoiceScreen';
 
-type Tab = 'gallery' | 'playground';
+type Tab = 'gallery' | 'playground' | 'voice';
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'gallery', label: 'Gallery' },
   { key: 'playground', label: 'Playground' },
+  { key: 'voice', label: 'Voice' },
 ];
 
 const TOP_INSET =
@@ -74,6 +76,7 @@ export default function App() {
       <View style={styles.body}>
         {tab === 'gallery' && <GalleryScreen dark={dark} />}
         {tab === 'playground' && <PlaygroundScreen dark={dark} />}
+        {tab === 'voice' && <VoiceScreen dark={dark} />}
       </View>
     </View>
   );

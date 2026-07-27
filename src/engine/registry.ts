@@ -16,6 +16,7 @@ import { buildMorph, precomputeMorph } from './morph';
 import { buildOrbits, precomputeOrbits } from './orbits';
 import { buildRibbon, precomputeRibbon } from './ribbon';
 import type { ModeImpl } from './types';
+import { buildVoice, precomputeVoice } from './voice';
 
 export const MODES: Record<ModeKey, ModeImpl> = {
   orbits: { precompute: precomputeOrbits, build: buildOrbits },
@@ -24,4 +25,5 @@ export const MODES: Record<ModeKey, ModeImpl> = {
   wave: { precompute: precomputeWave, build: buildWave },
   ribbon: { precompute: precomputeRibbon, build: buildRibbon },
   morph: { precompute: precomputeMorph, build: buildMorph },
+  voice: { precompute: precomputeVoice, build: buildVoice },
 };

@@ -29,6 +29,26 @@ export interface ModeStaticData {
 export type ModePrecompute = (opts: ModeOpts) => ModeStaticData;
 
 /**
+ * The per-frame inputs that are NOT fixed by the preset — the live audio
+ * level and, for the voice mode, which behaviour is being blended into
+ * which. Passed as one object (a reused per-runtime scratch, never
+ * allocated per frame) so modes can grow inputs without changing every
+ * signature.
+ *
+ * The six ported modes ignore this entirely.
+ */
+export interface ModeDynamics {
+  /** Smoothed audio level, 0–1. `0` when no amplitude is being driven. */
+  amp: number;
+  /** Behaviour index being blended FROM (see `voice.ts`). */
+  from: number;
+  /** Behaviour index being blended TO. */
+  to: number;
+  /** Blend position: 0 = fully `from`, 1 = fully `to`. */
+  mix: number;
+}
+
+/**
  * One frame: fills `buf` (already reset to `count` 0) with the mode's dot
  * cloud at time `t` for the given rendered `size`. A Reanimated worklet —
  * it may only touch its parameters plus module-level worklet helpers.
@@ -38,7 +58,8 @@ export type ModeBuild = (
   size: number,
   t: number,
   opts: ModeOpts,
-  staticData: any
+  staticData: any,
+  dyn: ModeDynamics
 ) => void;
 
 export interface ModeImpl {
