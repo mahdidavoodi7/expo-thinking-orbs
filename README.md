@@ -340,8 +340,14 @@ precomputed once per resolved preset on the JS thread.
 
 - Each orb is an `accessibilityRole="image"` with a sensible per‑state
   `accessibilityLabel` (e.g. `"Searching…"`), overridable via the prop.
-- `prefers-reduced-motion` (via Reanimated's `useReducedMotion`) renders a
-  single static, representative frame — no animation — still following the theme.
+- `prefers-reduced-motion` (via Reanimated's `useReducedMotion`) slows the orb
+  to a third of its pace rather than freezing it, and holds the voice level
+  constant so the shell stops tracking speech. Reduced motion asks for less
+  motion, not none — and a frozen orb loses the state distinction entirely,
+  since `idle`, `listening` and `thinking` share a resting radius by design
+  and it is the *motion* that tells them apart. Theme is still followed.
+- `paused` stops the clock completely if you do want a still orb, and the
+  voice `failed` state freezes on its own.
 
 ## 📱 Running the example app
 

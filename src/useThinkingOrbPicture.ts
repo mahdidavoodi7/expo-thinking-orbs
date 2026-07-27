@@ -32,8 +32,19 @@ import type { ThinkingOrbProps } from './types';
 // advances the phase by at most a few frames instead of the whole gap —
 // the animation continues from its current pose without a visible jump.
 const MAX_DT_MS = 100;
-// Reduced-motion users see this deterministic, representative frame.
-export const REDUCED_T = 0.6;
+/**
+ * Speed multiplier under reduced motion. The orb keeps animating rather
+ * than freezing on a representative frame, because freezing destroys the
+ * one thing it exists to communicate: `idle`, `listening` and `thinking`
+ * share a 0.9 resting radius by design, so what separates them IS the
+ * motion, and no still frame recovers it. The setting asks for less
+ * motion, not none.
+ *
+ * A third of the pace keeps every state legible while removing the quick
+ * gestures — the spike lunges, the fast `connecting` churn — that make
+ * motion uncomfortable in the first place.
+ */
+const REDUCED_SPEED = 0.3;
 /**
  * The amplitude a reduced-motion orb is drawn at. Pinning it to 0 froze
  * `listening` and `speaking` at their emptiest pose — a 0.9 shell with a
@@ -43,22 +54,14 @@ export const REDUCED_T = 0.6;
  * pose it is recognised by: `speaking` sits visibly smaller (0.79 against
  * 0.9) with outward wavefronts, `listening` fuller with inward ones.
  *
- * This adds no motion. `t` is still pinned to {@linkcode REDUCED_T} and
- * the live level is never read, so the orb remains a still image.
+ * The LIVE level is never read here. Voice-locked amplitude is fast,
+ * irregular motion driven by something the viewer cannot anticipate,
+ * which is precisely what the setting asks to be spared — so the level is
+ * held constant and only the wavefronts drift, at {@linkcode
+ * REDUCED_SPEED}.
  *
  * 0.85 rather than a peak: the benefit rises monotonically with level but
- * flattens, and 0.85 still reads as a real speech level. Measured as RMS
- * difference in rendered radius/ink across the shell, against amp 0:
- * `listening`/`speaking` 0.087 → 0.105, `idle`/`speaking` 0.092 → 0.100.
- *
- * KNOWN LIMIT: this does not separate `idle` from `listening`, which stay
- * at 0.043 RMS — measurably the weakest pair at every level, including
- * 1.0. The three connected states share a 0.9 resting radius *by design*
- * (`voice.ts` calls `thinking` "the calm middle"), so what distinguishes
- * them is the motion itself, and no choice of still frame recovers it.
- * Closing that needs either a static per-state differentiator invented
- * for reduced motion, or gentle motion retained instead of a freeze —
- * both design calls, not implementation ones.
+ * flattens, and 0.85 still reads as a real speech level.
  */
 const REDUCED_AMP = 0.85;
 
@@ -143,7 +146,7 @@ export function useThinkingOrbPicture({
   const lut = useMemo(() => buildColorLUT(dark, color), [dark, color]);
   const reduced = useReducedMotion();
 
-  const effSpeed = resolved.speed * speed;
+  const effSpeed = resolved.speed * speed * (reduced ? REDUCED_SPEED : 1);
   const effSpeedSV = useSharedValue(effSpeed);
   useEffect(() => {
     effSpeedSV.value = effSpeed;
@@ -231,35 +234,30 @@ export function useThinkingOrbPicture({
   }, false);
 
   useEffect(() => {
-    frame.setActive(!paused && !reduced);
-  }, [paused, reduced, frame]);
+    // Reduced motion slows the clock (see REDUCED_SPEED); it does not stop
+    // it. Only `paused` and the frozen `failed` state stop the clock.
+    frame.setActive(!paused);
+  }, [paused, frame]);
 
   const dotCount = staticData.dotCount;
 
   return useDerivedValue(() => {
-    const t = reduced ? REDUCED_T : Math.max(0, phase.value);
+    const t = Math.max(0, phase.value);
     // High-res timer polyfilled on the UI runtime; read via globalThis so
     // no ambient `performance` global leaks into the published types.
     const perf = (globalThis as { performance?: { now(): number } })
       .performance;
     const timed = debugFrameMs != null && perf != null;
     const t0 = timed && perf ? perf.now() : 0;
-    // Reduce-motion pins the level to a constant: an orb that still moved
-    // with the voice would be the only thing animating on screen, which is
-    // the opposite of what the setting asks for. A CONSTANT rather than
-    // zero, so the amplitude-driven states stay recognisable — see
+    // Reduce-motion holds the level constant — the shell keeps its shape
+    // but stops tracking the voice, which is the fast irregular part. See
     // REDUCED_AMP.
     const amp = reduced ? REDUCED_AMP : level.value;
     const buf = acquireDotBuffer(dotCount);
-    // `mix` is driven by withTiming, which runs independently of the frame
-    // callback — without this guard a reduce-motion user would get a static
-    // orb that still animated 420ms of travel on every state change.
-    const dyn = acquireDynamics(
-      amp,
-      behFrom.value,
-      behTo.value,
-      reduced ? 1 : mix.value
-    );
+    // Blends run under reduced motion too. `mix` is driven by withTiming,
+    // independently of the frame callback, and cutting between behaviours
+    // instead would be a harder visual event than the travel it replaces.
+    const dyn = acquireDynamics(amp, behFrom.value, behTo.value, mix.value);
     build(buf, size, t, opts, staticData, dyn);
     const pic = recordPicture(buf, size, lut, rMin);
     if (timed && perf && debugFrameMs != null) {
