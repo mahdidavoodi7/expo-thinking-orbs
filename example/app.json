@@ -8,7 +8,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "expothinkingorbs.example"
+      "bundleIdentifier": "expothinkingorbs.example",
+      "infoPlist": {
+        "CADisableMinimumFrameDuration": true
+      }
     },
     "android": {
       "adaptiveIcon": {

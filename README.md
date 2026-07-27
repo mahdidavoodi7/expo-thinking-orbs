@@ -78,6 +78,26 @@ Babel plugin — `babel-preset-expo` adds it automatically on Expo).
 > React Native 0.76 / Expo SDK 52. Old‑architecture apps can't use this
 > library until they migrate.
 
+### 120 Hz on ProMotion
+
+iOS caps `CADisplayLink` — which drives the orb's frame callback — at **60 fps**
+unless your app opts in, so on an iPhone Pro the animation runs at half the
+refresh rate the display is capable of. This is an app‑level setting; the
+library can't enable it for you.
+
+```json
+// app.json
+{ "expo": { "ios": { "infoPlist": { "CADisableMinimumFrameDuration": true } } } }
+```
+
+Bare React Native apps set the same `CADisableMinimumFrameDuration` key to
+`true` in `Info.plist` directly. Android has no equivalent opt‑in — high
+refresh rate is negotiated by the system.
+
+Opting in doubles the orb's per‑frame budget pressure: the same work now has
+**8.3 ms** per frame instead of 16.7 ms. Prefer one shared `<Canvas>` (see
+[Many orbs?](#-many-orbs-share-one-canvas)) if you render several at once.
+
 ## 🚀 Quick start
 
 ```tsx
