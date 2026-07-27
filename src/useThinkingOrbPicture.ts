@@ -34,6 +34,33 @@ import type { ThinkingOrbProps } from './types';
 const MAX_DT_MS = 100;
 // Reduced-motion users see this deterministic, representative frame.
 export const REDUCED_T = 0.6;
+/**
+ * The amplitude a reduced-motion orb is drawn at. Pinning it to 0 froze
+ * `listening` and `speaking` at their emptiest pose — a 0.9 shell with a
+ * barely-there ripple — which is where they are least distinguishable
+ * from `idle` and `thinking`, in a component whose entire job is state
+ * indication. A representative level instead lets each state show the
+ * pose it is recognised by: `speaking` sits visibly smaller (0.79 against
+ * 0.9) with outward wavefronts, `listening` fuller with inward ones.
+ *
+ * This adds no motion. `t` is still pinned to {@linkcode REDUCED_T} and
+ * the live level is never read, so the orb remains a still image.
+ *
+ * 0.85 rather than a peak: the benefit rises monotonically with level but
+ * flattens, and 0.85 still reads as a real speech level. Measured as RMS
+ * difference in rendered radius/ink across the shell, against amp 0:
+ * `listening`/`speaking` 0.087 → 0.105, `idle`/`speaking` 0.092 → 0.100.
+ *
+ * KNOWN LIMIT: this does not separate `idle` from `listening`, which stay
+ * at 0.043 RMS — measurably the weakest pair at every level, including
+ * 1.0. The three connected states share a 0.9 resting radius *by design*
+ * (`voice.ts` calls `thinking` "the calm middle"), so what distinguishes
+ * them is the motion itself, and no choice of still frame recovers it.
+ * Closing that needs either a static per-state differentiator invented
+ * for reduced motion, or gentle motion retained instead of a freeze —
+ * both design calls, not implementation ones.
+ */
+const REDUCED_AMP = 0.85;
 
 // One-pole smoothing time constants. Speech onsets need to land almost
 // immediately or the orb lags the voice; the decay is slower so syllable
@@ -146,7 +173,13 @@ export function useThinkingOrbPicture({
   useEffect(() => {
     if (voice == null) return;
     if (behTo.value === voice) return;
-    behFrom.value = behTo.value;
+    // A change arriving MID-blend cannot resume from the pose on screen:
+    // that pose is a lerp of two behaviours, and `from` can only name one
+    // of them. Start from whichever endpoint the pose is currently nearer
+    // — that halves the worst-case jump, from |B−A| to 0.5·|B−A|, against
+    // always taking the outgoing target. Removing the jump entirely needs
+    // a three-way blend; see plans/002.
+    if (mix.value >= 0.5) behFrom.value = behTo.value;
     behTo.value = voice;
     mix.value = 0;
     mix.value = withTiming(1, { duration: BLEND_MS });
@@ -211,10 +244,12 @@ export function useThinkingOrbPicture({
       .performance;
     const timed = debugFrameMs != null && perf != null;
     const t0 = timed && perf ? perf.now() : 0;
-    // Reduce-motion pins the level to 0: an orb that still moved with the
-    // voice would be the only thing animating on screen, which is the
-    // opposite of what the setting asks for.
-    const amp = reduced ? 0 : level.value;
+    // Reduce-motion pins the level to a constant: an orb that still moved
+    // with the voice would be the only thing animating on screen, which is
+    // the opposite of what the setting asks for. A CONSTANT rather than
+    // zero, so the amplitude-driven states stay recognisable — see
+    // REDUCED_AMP.
+    const amp = reduced ? REDUCED_AMP : level.value;
     const buf = acquireDotBuffer(dotCount);
     // `mix` is driven by withTiming, which runs independently of the frame
     // callback — without this guard a reduce-motion user would get a static

@@ -3,9 +3,8 @@
 // There is no microphone here: a frame callback synthesises a speech-like
 // envelope on the UI thread and writes it into the same SharedValue a real
 // app would write mic / output levels into, so the swell behaves exactly
-// as it will in production. Tap a state to pin it, or leave the auto-cycle
-// running to watch the transitions.
-import { useEffect, useRef, useState } from 'react';
+// as it will in production. Tap a state to see it.
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   useFrameCallback,
@@ -24,17 +23,6 @@ const STATES: VoiceOrbState[] = [
   'thinking',
   'speaking',
   'failed',
-];
-
-/** The loop a real turn takes, with how long to hold each leg. */
-const CYCLE: { state: VoiceOrbState; ms: number }[] = [
-  { state: 'connecting', ms: 1600 },
-  { state: 'pre-connect-buffering', ms: 1600 },
-  { state: 'initializing', ms: 1600 },
-  { state: 'idle', ms: 2200 },
-  { state: 'listening', ms: 3200 },
-  { state: 'thinking', ms: 1800 },
-  { state: 'speaking', ms: 4000 },
 ];
 
 /**
@@ -57,32 +45,19 @@ function useFakeLevel(active: boolean): SharedValue<number> {
     level.value = Math.min(1, syllable * (0.35 + 0.65 * phrase) * breath);
   }, false);
 
+  // Just stop synthesising. The level is deliberately left where it lies:
+  // VoiceOrb ignores amplitude outside `listening`/`speaking` and releases
+  // its own smoothed level through RELEASE_MS, so zeroing here would only
+  // race that release.
   useEffect(() => {
     frame.setActive(active);
-    if (!active) level.value = 0;
-  }, [active, frame, level]);
+  }, [active, frame]);
 
   return level;
 }
 
 export function VoiceScreen({ dark }: { dark: boolean }) {
-  const [auto, setAuto] = useState(true);
-  const [state, setState] = useState<VoiceOrbState>('connecting');
-  // Hold the level steady to inspect a behaviour at a fixed amplitude,
-  // instead of chasing the synthesised envelope.
-  const [hold, setHold] = useState<number | null>(null);
-  const leg = useRef(0);
-
-  // Auto-cycle: each leg schedules the next, so the hold times above are
-  // honoured rather than every state getting the same slice.
-  useEffect(() => {
-    if (!auto) return;
-    const id = setTimeout(() => {
-      leg.current = (leg.current + 1) % CYCLE.length;
-      setState(CYCLE[leg.current].state);
-    }, CYCLE[leg.current].ms);
-    return () => clearTimeout(id);
-  }, [auto, state]);
+  const [state, setState] = useState<VoiceOrbState>('listening');
 
   // Only the direction in play needs a live level; VoiceOrb ignores the
   // other one anyway, so there is no point burning a frame callback on it.
@@ -101,8 +76,8 @@ export function VoiceScreen({ dark }: { dark: boolean }) {
         <VoiceOrb
           state={state}
           size={180}
-          inputAmplitude={hold ?? input}
-          outputAmplitude={hold ?? output}
+          inputAmplitude={input}
+          outputAmplitude={output}
         />
         <Text style={[styles.stageLabel, { color: fg }]}>{state}</Text>
         <Text style={[styles.stageHint, { color: mutedFg }]}>
@@ -114,49 +89,13 @@ export function VoiceScreen({ dark }: { dark: boolean }) {
         </Text>
       </View>
 
-      <Pressable
-        onPress={() => setAuto((a) => !a)}
-        style={[styles.toggle, { backgroundColor: card }]}
-        accessibilityRole="button"
-        accessibilityState={{ selected: auto }}
-      >
-        <Text style={[styles.toggleText, { color: fg }]}>
-          {auto ? '❙❙  Stop auto-cycle' : '▶  Run auto-cycle'}
-        </Text>
-      </Pressable>
-
-      <View style={styles.holdRow}>
-        {[null, 0, 0.35, 0.7, 1].map((h) => {
-          const active = hold === h;
-          return (
-            <Pressable
-              key={String(h)}
-              onPress={() => setHold(h)}
-              style={[
-                styles.chip,
-                { backgroundColor: active ? chipOn : chipBg },
-              ]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-            >
-              <Text style={[styles.chipText, { color: active ? fg : mutedFg }]}>
-                {h === null ? 'live' : `amp ${h}`}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
       <View style={styles.chips}>
         {STATES.map((s) => {
           const active = s === state;
           return (
             <Pressable
               key={s}
-              onPress={() => {
-                setAuto(false);
-                setState(s);
-              }}
+              onPress={() => setState(s)}
               style={[
                 styles.chip,
                 { backgroundColor: active ? chipOn : chipBg },
@@ -195,19 +134,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
     paddingHorizontal: 24,
-  },
-  toggle: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  toggleText: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  holdRow: {
-    flexDirection: 'row',
-    gap: 8,
   },
   chips: {
     flexDirection: 'row',
