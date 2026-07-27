@@ -7,7 +7,12 @@
 // plane and the traveling wobble are recomputed each frame.
 
 import { fibDir, makeProj, radiusScale } from './core';
-import type { DotBuffer, ModeOpts, ModeStaticData } from './types';
+import type {
+  DotBuffer,
+  ModeDynamics,
+  ModeOpts,
+  ModeStaticData,
+} from './types';
 
 export interface RibbonData extends ModeStaticData {
   // ghost great-circle directions (fibonacci lattice)
@@ -79,7 +84,8 @@ export function buildRibbon(
   size: number,
   t: number,
   o: ModeOpts,
-  s: RibbonData
+  s: RibbonData,
+  dyn: ModeDynamics
 ): void {
   'worklet';
   const cx = size / 2;
@@ -88,7 +94,7 @@ export function buildRibbon(
   // spin scales the 3D tumble; spin=0 freezes the band's orientation,
   // leaving only the traveling undulation
   const spin = o.spin ?? 1;
-  const pt = makeProj(t * 0.1 * spin, 0.3, cx, cy, 1);
+  const pt = makeProj(t * 0.1 * spin + dyn.yaw, 0.3 + dyn.pitch, cx, cy, 1);
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const rBase = o.rBase ?? 1.1;
   const rDepth = o.rDepth ?? 1.7;

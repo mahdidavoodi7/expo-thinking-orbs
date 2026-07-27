@@ -46,6 +46,20 @@ export interface ModeDynamics {
   to: number;
   /** Blend position: 0 = fully `from`, 1 = fully `to`. */
   mix: number;
+  /**
+   * Extra yaw in radians, added to whatever rotation the mode already
+   * applies. Meant for device orientation: because it enters the
+   * PROJECTION rather than being a transform on the rendered view, the far
+   * side of the globe genuinely rotates into sight. A transform on the
+   * container can only skew the finished 2-D picture, which reads as a
+   * tilted photograph of a sphere rather than a sphere being tilted.
+   *
+   * `0` when nothing is driving it — every mode adds it unconditionally,
+   * and adding zero is free.
+   */
+  yaw: number;
+  /** Extra pitch in radians, added to the mode's own tilt. Same contract. */
+  pitch: number;
 }
 
 /**

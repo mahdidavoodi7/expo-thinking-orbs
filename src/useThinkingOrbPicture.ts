@@ -185,6 +185,7 @@ export function useThinkingOrbPicture({
   colorCycleMs = 9000,
   amplitude,
   bands,
+  tilt,
   voice,
   debugFrameMs,
 }: UseThinkingOrbPictureOptions = {}): DerivedValue<SkPicture> {
@@ -220,6 +221,18 @@ export function useThinkingOrbPicture({
     if (typeof colorShift === 'number') ownShiftSV.value = colorShift;
   }, [colorShift, ownShiftSV]);
   const shiftSV = typeof colorShift === 'number' ? ownShiftSV : colorShift;
+
+  // Globe rotation, same number-or-SharedValue handling again.
+  const ownYawSV = useSharedValue(0);
+  const ownPitchSV = useSharedValue(0);
+  const tYaw = tilt?.yaw;
+  const tPitch = tilt?.pitch;
+  useEffect(() => {
+    if (typeof tYaw === 'number') ownYawSV.value = tYaw;
+    if (typeof tPitch === 'number') ownPitchSV.value = tPitch;
+  }, [tYaw, tPitch, ownYawSV, ownPitchSV]);
+  const yawSV = typeof tYaw === 'number' ? ownYawSV : tYaw;
+  const pitchSV = typeof tPitch === 'number' ? ownPitchSV : tPitch;
   const reduced = useReducedMotion();
 
   const effSpeed = resolved.speed * speed * (reduced ? REDUCED_SPEED : 1);
@@ -367,7 +380,17 @@ export function useThinkingOrbPicture({
     // Blends run under reduced motion too. `mix` is driven by withTiming,
     // independently of the frame callback, and cutting between behaviours
     // instead would be a harder visual event than the travel it replaces.
-    const dyn = acquireDynamics(amp, behFrom.value, behTo.value, mix.value);
+    // Reduced motion keeps the globe level: this rotation is driven by the
+    // device, so it is the fast, irregular, unanticipatable kind of motion
+    // the setting exists to remove, and it carries no state.
+    const dyn = acquireDynamics(
+      amp,
+      behFrom.value,
+      behTo.value,
+      mix.value,
+      reduced || yawSV == null ? 0 : yawSV.value,
+      reduced || pitchSV == null ? 0 : pitchSV.value
+    );
     build(buf, size, t, opts, staticData, dyn);
     // The voice pass runs on the BUILT cloud, which is what lets it apply
     // to every mode rather than to the voice shell alone.

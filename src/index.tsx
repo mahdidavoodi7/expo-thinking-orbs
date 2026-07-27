@@ -46,6 +46,7 @@ export {
 export type {
   ThinkingOrbProps,
   OrbBands,
+  OrbTilt,
   OrbState,
   OrbSize,
   OrbTheme,

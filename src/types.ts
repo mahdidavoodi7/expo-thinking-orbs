@@ -56,6 +56,17 @@ export interface OrbBands {
   high?: SharedValue<number> | number;
 }
 
+/**
+ * Extra globe rotation in radians. Both axes are optional and default to
+ * no rotation.
+ */
+export interface OrbTilt {
+  /** Yaw — spins the globe about its vertical axis. */
+  yaw?: SharedValue<number> | number;
+  /** Pitch — tips the pole toward or away from the viewer. */
+  pitch?: SharedValue<number> | number;
+}
+
 /** Props for the ThinkingOrb component. */
 export interface ThinkingOrbProps {
   /** Which animation to show. @default 'working' */
@@ -107,6 +118,22 @@ export interface ThinkingOrbProps {
    * @default 9000
    */
   colorCycleMs?: number;
+
+  /**
+   * Rotate the orb as a globe, in radians, on top of whatever rotation its
+   * animation is already doing.
+   *
+   * This enters the PROJECTION, so the far side genuinely turns into
+   * sight — dots on the leading edge sweep away, hidden ones come round.
+   * That is the difference between this and a `rotateX`/`rotateY` transform
+   * on the view: a transform skews the finished flat picture, which reads
+   * as a tilted photograph of a sphere rather than a sphere being turned.
+   *
+   * Intended for device orientation, but it is just an angle — a drag, a
+   * scroll offset or a spring works identically. Use `SharedValue`s so it
+   * can be driven per frame without re-rendering React.
+   */
+  tilt?: OrbTilt;
 
   /**
    * Rendered size in points. Any number — the nearer of the two tuned

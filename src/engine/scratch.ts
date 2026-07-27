@@ -53,13 +53,15 @@ export function acquireDynamics(
   amp: number,
   from: number,
   to: number,
-  mix: number
+  mix: number,
+  yaw: number = 0,
+  pitch: number = 0
 ): ModeDynamics {
   'worklet';
   const g = globalThis as ScratchGlobal;
   let d = g.__expoThinkingOrbsDyn;
   if (d === undefined) {
-    d = { amp, from, to, mix };
+    d = { amp, from, to, mix, yaw, pitch };
     g.__expoThinkingOrbsDyn = d;
     return d;
   }
@@ -67,6 +69,8 @@ export function acquireDynamics(
   d.from = from;
   d.to = to;
   d.mix = mix;
+  d.yaw = yaw;
+  d.pitch = pitch;
   return d;
 }
 
