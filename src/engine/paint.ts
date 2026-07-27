@@ -30,6 +30,25 @@ interface PaintScratchGlobal {
   __expoThinkingOrbsCounts?: Int32Array;
   __expoThinkingOrbsRect?: SkRect;
   __expoThinkingOrbsRectSize?: number;
+  __expoThinkingOrbsBlend?: Float32Array;
+}
+
+/**
+ * The single colour the two-ramp path writes into, reused for every dot of
+ * every frame. `setColor` reads the components out immediately, so one
+ * mutable RGBA is safe and keeps the blend allocation-free — the same rule
+ * the paint and index buffers above already follow.
+ */
+function acquireBlendColor(): Float32Array {
+  'worklet';
+  const g = globalThis as PaintScratchGlobal;
+  let c = g.__expoThinkingOrbsBlend;
+  if (c === undefined) {
+    c = new Float32Array(4);
+    c[3] = 1;
+    g.__expoThinkingOrbsBlend = c;
+  }
+  return c;
 }
 
 /**
@@ -38,12 +57,22 @@ interface PaintScratchGlobal {
  * rendered radius. The sort is an explicitly stabilised index sort
  * (z, then emission order), so equal-z dots — e.g. the flat morph
  * outline — keep their emission order.
+ *
+ * Pass `lutTo` to blend between two ramps. `shift` (0–1) moves the whole
+ * cloud between them; `spread` adds the dot's OWN ink level to the blend,
+ * so near and far dots sit at different points on the gradient and the
+ * shell carries a colour depth rather than changing as one flat mass.
+ * Both are ignored when `lutTo` is omitted, which is the original path
+ * verbatim — one array index, no arithmetic.
  */
 export function recordPicture(
   buf: DotBuffer,
   size: number,
   lut: ColorLUT,
-  rMin: number
+  rMin: number,
+  lutTo?: ColorLUT,
+  shift?: number,
+  spread?: number
 ): SkPicture {
   'worklet';
   const g = globalThis as PaintScratchGlobal;
@@ -57,6 +86,9 @@ export function recordPicture(
 
   const n = buf.count;
   const zs = buf.zs;
+  // Hoisted out of the dot loop; a no-op lookup when the second ramp is
+  // absent, which is the common case.
+  const blend = acquireBlendColor();
 
   let order = g.__expoThinkingOrbsOrder;
   let bucket = g.__expoThinkingOrbsBucket;
@@ -133,7 +165,24 @@ export function recordPicture(
     let w = ws[d];
     if (w < 0) w = 0;
     else if (w > 1) w = 1;
-    paint.setColor(lut[Math.round(w * 255)]);
+    const idx = Math.round(w * 255);
+    if (lutTo === undefined) {
+      paint.setColor(lut[idx]!);
+    } else {
+      // `w - 0.5` so `spread` fans the blend symmetrically about the
+      // middle of the ramp: raising it pushes near and far dots apart in
+      // colour without dragging the whole cloud toward one endpoint,
+      // which is what adding raw `w` would do.
+      let m = shift! + spread! * (w - 0.5);
+      if (m < 0) m = 0;
+      else if (m > 1) m = 1;
+      const ca = lut[idx]!;
+      const cb = lutTo[idx]!;
+      blend[0] = ca[0]! + (cb[0]! - ca[0]!) * m;
+      blend[1] = ca[1]! + (cb[1]! - ca[1]!) * m;
+      blend[2] = ca[2]! + (cb[2]! - ca[2]!) * m;
+      paint.setColor(blend);
+    }
     paint.setAlphaf(alpha);
     const r = rs[d];
     canvas.drawCircle(xs[d], ys[d], r < rMin ? rMin : r, paint);

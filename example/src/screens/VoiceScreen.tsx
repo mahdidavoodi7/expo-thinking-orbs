@@ -130,9 +130,15 @@ export function VoiceScreen({ dark }: { dark: boolean }) {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={[styles.stage, { backgroundColor: card }]}>
+        {/* Two ink endpoints, so the orb drifts along a gradient on its own
+            clock instead of sitting at one hue. `colorSpread` is what makes
+            it read as depth rather than a flat disc changing colour. */}
         <VoiceOrb
           state={state}
           size={180}
+          color="#6E56CF"
+          colorTo="#2FE0AE"
+          colorSpread={0.6}
           inputAmplitude={input}
           outputAmplitude={output}
           inputLevels={inputBands}

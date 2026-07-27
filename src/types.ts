@@ -73,6 +73,42 @@ export interface ThinkingOrbProps {
   bands?: OrbBands;
 
   /**
+   * A second ink endpoint. Supplying it turns `color` into a gradient the
+   * dots move along instead of a single hue, and is what enables every
+   * colour animation below — with no `colorTo` the painter takes the
+   * original single-ramp path verbatim.
+   */
+  colorTo?: string;
+
+  /**
+   * Where the cloud sits between `color` (0) and `colorTo` (1).
+   *
+   * Omit it and the orb drives it from its own clock, drifting back and
+   * forth over {@linkcode ThinkingOrbProps.colorCycleMs}. Supply a
+   * `SharedValue` to drive it yourself — from a gesture, a scroll offset,
+   * a device tilt — at frame rate, without re-rendering React.
+   */
+  colorShift?: SharedValue<number> | number;
+
+  /**
+   * How far a dot's own depth offsets its blend, 0–1.
+   *
+   * At 0 the whole shell is one colour that drifts as a mass. Higher
+   * values fan near and far dots apart along the gradient, so the orb has
+   * colour depth rather than looking like a flat disc changing hue.
+   * @default 0.6
+   */
+  colorSpread?: number;
+
+  /**
+   * Period of the built-in colour drift, in ms. Ignored when `colorShift`
+   * is supplied. Slow by default — a colour cycle that reads as motion
+   * competes with the animation it is colouring.
+   * @default 9000
+   */
+  colorCycleMs?: number;
+
+  /**
    * Rendered size in points. Any number — the nearer of the two tuned
    * designs (64 / 20) is picked at a cutoff and scaled to `size`.
    * @default 64

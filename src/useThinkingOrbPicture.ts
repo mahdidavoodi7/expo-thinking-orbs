@@ -179,6 +179,10 @@ export function useThinkingOrbPicture({
   speed = 1,
   paused = false,
   color,
+  colorTo,
+  colorShift,
+  colorSpread = 0.6,
+  colorCycleMs = 9000,
   amplitude,
   bands,
   voice,
@@ -202,6 +206,20 @@ export function useThinkingOrbPicture({
 
   const dark = useResolvedDark(theme);
   const lut = useMemo(() => buildColorLUT(dark, color), [dark, color]);
+  // Built only when a second endpoint exists; `undefined` is the signal
+  // the painter uses to take the original single-ramp path.
+  const lutTo = useMemo(
+    () => (colorTo == null ? undefined : buildColorLUT(dark, colorTo)),
+    [dark, colorTo]
+  );
+
+  // Same number-or-SharedValue handling as amplitude. `undefined` here
+  // means "nobody is driving it", which is what selects the built-in drift.
+  const ownShiftSV = useSharedValue(0);
+  useEffect(() => {
+    if (typeof colorShift === 'number') ownShiftSV.value = colorShift;
+  }, [colorShift, ownShiftSV]);
+  const shiftSV = typeof colorShift === 'number' ? ownShiftSV : colorShift;
   const reduced = useReducedMotion();
 
   const effSpeed = resolved.speed * speed * (reduced ? REDUCED_SPEED : 1);
@@ -384,7 +402,23 @@ export function useThinkingOrbPicture({
         bandHigh.value
       );
     }
-    const pic = recordPicture(buf, size, lut, rMin);
+    // Where the cloud sits between the two ramps. A caller-driven shift
+    // wins; otherwise the orb drifts on its own clock. Under reduced
+    // motion the drift is pinned to the middle of the gradient — a colour
+    // cycle is motion, and this is the one place it can be removed without
+    // costing a state signal, since the hue carries none.
+    let shift = 0;
+    if (lutTo !== undefined) {
+      if (shiftSV != null) {
+        const s = shiftSV.value;
+        shift = !(s > 0) ? 0 : s > 1 ? 1 : s;
+      } else if (reduced) {
+        shift = 0.5;
+      } else {
+        shift = 0.5 + 0.5 * Math.sin((t * 2 * Math.PI * 1000) / colorCycleMs);
+      }
+    }
+    const pic = recordPicture(buf, size, lut, rMin, lutTo, shift, colorSpread);
     if (timed && perf && debugFrameMs != null) {
       debugFrameMs.value = perf.now() - t0;
     }
@@ -395,6 +429,9 @@ export function useThinkingOrbPicture({
     staticData,
     dotCount,
     lut,
+    lutTo,
+    colorSpread,
+    colorCycleMs,
     size,
     rMin,
     reduced,

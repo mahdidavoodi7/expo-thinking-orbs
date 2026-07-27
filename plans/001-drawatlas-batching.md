@@ -93,9 +93,27 @@ Exact constants to use:
   - `scos = (2 * r) / SPRITE_PX`, `ssin = 0` (no rotation — a disc is
     rotationally symmetric, so never spend a `sin`/`cos` here)
   - `tx = x - r`, `ty = y - r`
-- Color per dot: take `lut[Math.round(w * 255)]` (already an unpremultiplied
-  32-bit ARGB int) and replace its alpha byte with `Math.round(alpha * 255)`.
-  Do **not** call `setAlphaf` — alpha rides in the `colors` array.
+- Color per dot: **CORRECTION — the LUT does not hold ints.** This step used to
+  say `lut[Math.round(w * 255)]` was "already an unpremultiplied 32-bit ARGB
+  int". It is not. `buildColorLUT` (`src/colors.ts`) returns
+  `Float32Array.of(r, g, b, 1)` per entry, which is exactly what
+  `paint.setColor` takes. `drawAtlas`'s `colors` argument wants `SkColor`, so
+  the executor must either:
+  - **(a)** build a parallel `Uint32Array` int ramp alongside the float one in
+    `buildColorLUT` — it is built once per `(dark, color)` on the JS thread, so
+    this is nearly free; or
+  - **(b)** pack float→ARGB per dot per frame, which is four rounds and three
+    shifts per dot and gives back part of what the batching just won.
+
+  Prefer (a).
+
+  This also interacts with the two-ramp colour blend landed after this plan was
+  written (`recordPicture`'s `lutTo` / `shift` / `spread`). That path lerps two
+  float entries into one reused scratch colour per dot, so with an int ramp it
+  would have to lerp in fixed point or pack after the lerp. **Decide this
+  before starting — it is the main design question left in this plan.**
+
+  Alpha still rides in the `colors` array rather than `setAlphaf`.
 - Sampling: `FilterMode.Linear` only. Do **not** set `MipmapMode.Linear`:
   upstream docs give `nearest` as the default for both filter and mipmap, and
   mipmapped sampling needs a mipmapped image, which `makeImageSnapshot()` on an
