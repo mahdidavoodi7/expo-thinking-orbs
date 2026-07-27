@@ -401,8 +401,16 @@ export function buildVoice(
     let shear = ra[2];
     let alpha = ra[3];
     let form = ra[4];
-    let spike = ra[5];
-    let crestGain = ra[6];
+    // The two wavefront terms are deliberately NOT blended into a single
+    // value here. Everything above is a scalar pose that interpolates
+    // meaningfully, but a pair of counter-travelling waves does not: their
+    // average is a wave with a direction neither behaviour has. They are
+    // carried per behaviour and their CONTRIBUTIONS blended, in the ripple
+    // block below.
+    const spikeA = ra[5];
+    const crestGainA = ra[6];
+    let spikeB = spikeA;
+    let crestGainB = crestGainA;
     if (blending) {
       ringState(to, ri, ringT, sinLat, t, amp, rb);
       rf += (rb[0] - rf) * mix;
@@ -410,8 +418,8 @@ export function buildVoice(
       shear += (rb[2] - shear) * mix;
       alpha += (rb[3] - alpha) * mix;
       form += (rb[4] - form) * mix;
-      spike += (rb[5] - spike) * mix;
-      crestGain += (rb[6] - crestGain) * mix;
+      spikeB = rb[5];
+      crestGainB = rb[6];
     }
 
     const cs = Math.cos(shear);
@@ -420,12 +428,25 @@ export function buildVoice(
     const sinLon = ring.sinLon;
     const base = ring.base;
     const scattered = form < 0.999;
-    const rippling = spike !== 0;
+    const rippling = spikeA !== 0 || spikeB !== 0;
+    // The travelling phase, wrapped into one period. `ripplePulse` has
+    // period TAU, so wrapping is bit-identical to the unwrapped
+    // `TAU * RIPPLE_RATE * t` — but the phase stays bounded no matter how
+    // long a session runs, which the family grammar requires of anything
+    // carrying `t`.
+    const cycles = RIPPLE_RATE * t;
+    const ph = TAU * (cycles - Math.floor(cycles));
     // Outward-carrying wavefronts travel out, inward-carrying ones travel
-    // in, so the motion of the wave and the motion of the dots agree. The
-    // sign flips only where `spike` crosses zero — mid-blend, where the
-    // displacement is zero too, so the reversal is invisible.
-    const flow = spike >= 0 ? -TAU * RIPPLE_RATE * t : TAU * RIPPLE_RATE * t;
+    // in, so the motion of the wave and the motion of the dots agree.
+    //
+    // Direction is read from each BEHAVIOUR's own spike, never from a
+    // blended one. A blended spike sweeps through zero on any direct
+    // listening ↔ speaking change — a barge-in — and flipping the sign of
+    // an accumulated phase at that moment teleported the whole wavefront
+    // pattern by an amount proportional to session uptime. Per behaviour,
+    // each sign is fixed for the whole blend, so nothing flips.
+    const flowA = spikeA >= 0 ? -ph : ph;
+    const flowB = spikeB >= 0 ? -ph : ph;
 
     for (let lj = 0; lj < cosLon.length; lj++) {
       // Project the UNIT vector: the projection is linear, so scaling
@@ -447,9 +468,21 @@ export function buildVoice(
         // dot the same distance out moves together — the coherence that
         // the earlier per-dot version threw away.
         const sr = Math.sqrt(dx * dx + dy * dy);
-        const rip = ripplePulse(TAU * RIPPLE_K * sr + flow);
-        dr += spike * rip;
-        dotCrest += crestGain * rip;
+        const kr = TAU * RIPPLE_K * sr;
+        const ripA = ripplePulse(kr + flowA);
+        let drAdd = spikeA * ripA;
+        let crestAdd = crestGainA * ripA;
+        if (blending) {
+          // Both waves, each in its own direction, crossfaded — the same
+          // idiom the ring pose above uses, applied one level deeper. The
+          // second evaluation costs a `sin` per dot, and only during the
+          // ~280 ms a transition is live.
+          const ripB = ripplePulse(kr + flowB);
+          drAdd += (spikeB * ripB - drAdd) * mix;
+          crestAdd += (crestGainB * ripB - crestAdd) * mix;
+        }
+        dr += drAdd;
+        dotCrest += crestAdd;
       }
       if (scattered) {
         const sc = s.scatter[base + lj];

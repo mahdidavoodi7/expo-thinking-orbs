@@ -131,12 +131,9 @@ export function useThinkingOrbPicture({
   }, [amplitude, ownAmpSV]);
   const ampSV = typeof amplitude === 'number' ? ownAmpSV : amplitude;
 
-  // The smoothed level, 0–1, read per dot by the voice shell.
+  // The smoothed level, 0–1, read per dot by the voice shell. Losing the
+  // amplitude source is a release, not a reset — see the frame callback.
   const level = useSharedValue(0);
-  const reactive = ampSV != null;
-  useEffect(() => {
-    if (!reactive) level.value = 0;
-  }, [reactive, level]);
 
   // Voice behaviour blending. `from`/`to` are behaviour indices and `mix`
   // walks 0 → 1 across a state change; the mode evaluates both and
@@ -174,17 +171,29 @@ export function useThinkingOrbPicture({
     if (dt > MAX_DT_MS) dt = MAX_DT_MS;
     phase.value += (dt / 1000) * effSpeedSV.value;
 
-    if (ampSV != null) {
-      // Clamp defensively: the SharedValue belongs to the caller, and a
-      // NaN would propagate into every dot coordinate.
-      let a = ampSV.value;
-      if (!(a > 0)) a = 0;
-      else if (a > 1) a = 1;
-      const cur = level.value;
+    const cur = level.value;
+    // Losing the source is a target of 0, not an assignment of 0. Every
+    // state but `listening`/`speaking` supplies no amplitude, so
+    // `speaking → thinking` — the most common transition in the machine —
+    // drops it; snapping the level there would bypass the RELEASE_MS
+    // release on precisely the transition it exists for. The `cur !== 0`
+    // arm keeps the six non-voice animations out of the filter entirely.
+    if (ampSV != null || cur !== 0) {
+      let a = 0;
+      if (ampSV != null) {
+        // Clamp defensively: the SharedValue belongs to the caller, and a
+        // NaN would propagate into every dot coordinate.
+        a = ampSV.value;
+        if (!(a > 0)) a = 0;
+        else if (a > 1) a = 1;
+      }
       // One-pole filter, frame-rate independent via the exponential — a
       // dropped frame lands in the same place as several short ones.
       const tau = a > cur ? ATTACK_MS : RELEASE_MS;
-      level.value = cur + (a - cur) * (1 - Math.exp(-dt / tau));
+      const next = cur + (a - cur) * (1 - Math.exp(-dt / tau));
+      // An exponential never quite reaches its target, so settle the tail
+      // exactly to 0 — otherwise the branch above can never switch off.
+      level.value = a === 0 && next < 1e-4 ? 0 : next;
     }
   }, false);
 
