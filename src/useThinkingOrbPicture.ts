@@ -65,6 +65,21 @@ const REDUCED_SPEED = 0.3;
  * flattens, and 0.85 still reads as a real speech level.
  */
 const REDUCED_AMP = 0.85;
+/**
+ * The band level a reduced-motion orb is drawn at, for the same reason and
+ * by the same rule as {@linkcode REDUCED_AMP}: hold the level constant so
+ * the shell keeps a shape, and stop it tracking the voice, which is the
+ * fast irregular part the setting actually asks to be spared. Zeroing the
+ * bands instead would remove the swell and ripple entirely — the same
+ * "freeze the orb and destroy what distinguishes the states" mistake
+ * REDUCED_AMP exists to correct, one layer up.
+ *
+ * Much lower than REDUCED_AMP because these terms compound: a constant
+ * 0.85 across all three would sit the shell at a permanent full swell with
+ * a standing ripple, which reads as a bug rather than as a resting state.
+ * 0.3 is visible without being loud.
+ */
+const REDUCED_BANDS = 0.3;
 
 // One-pole smoothing time constants. Speech onsets need to land almost
 // immediately or the orb lags the voice; the decay is slower so syllable
@@ -337,13 +352,29 @@ export function useThinkingOrbPicture({
     const dyn = acquireDynamics(amp, behFrom.value, behTo.value, mix.value);
     build(buf, size, t, opts, staticData, dyn);
     // The voice pass runs on the BUILT cloud, which is what lets it apply
-    // to every mode rather than to the voice shell alone. Under reduced
-    // motion the bands are zeroed rather than held at a representative
-    // value: unlike the shell — where motion IS the state signal, so
-    // freezing destroys it (see REDUCED_AMP) — this pass carries no state,
-    // and holding it at a constant would only add a permanent swell and a
-    // frozen ripple to a setting that asked for less movement.
-    if (!reduced) {
+    // to every mode rather than to the voice shell alone.
+    //
+    // Reduced motion holds the bands constant rather than zeroing them —
+    // the same rule as REDUCED_AMP, and for the same reason. Zeroing would
+    // drop the swell and ripple entirely, which is the "freeze it and lose
+    // what tells the states apart" failure that decision already corrects
+    // for the shell. Held constant, the shape survives and only the
+    // wavefront drifts, at REDUCED_SPEED. Bands still present or settled at
+    // zero decide WHETHER audio is driving the orb at all, so a silent
+    // caller stays a no-op here too.
+    const driven = bandLow.value > 0 || bandMid.value > 0 || bandHigh.value > 0;
+    if (reduced) {
+      if (driven) {
+        applyVoicePass(
+          buf,
+          size,
+          t,
+          REDUCED_BANDS,
+          REDUCED_BANDS,
+          REDUCED_BANDS
+        );
+      }
+    } else {
       applyVoicePass(
         buf,
         size,

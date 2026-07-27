@@ -11,7 +11,11 @@ import {
   useSharedValue,
   type SharedValue,
 } from 'react-native-reanimated';
-import { VoiceOrb, type VoiceOrbState } from 'expo-thinking-orbs';
+import {
+  useVoiceLevels,
+  VoiceOrb,
+  type VoiceOrbState,
+} from 'expo-thinking-orbs';
 
 const STATES: VoiceOrbState[] = [
   'disconnected',
@@ -56,6 +60,57 @@ function useFakeLevel(active: boolean): SharedValue<number> {
   return level;
 }
 
+/** Samples per synthesised block — 32 ms at 16 kHz, a typical mic callback. */
+const BLOCK = 512;
+const RATE = 16_000;
+
+/**
+ * Synthesise a block of speech-like PCM and push it through
+ * {@linkcode useVoiceLevels}, on the same ~32 ms cadence a recorder would
+ * deliver buffers on.
+ *
+ * Deliberately PCM rather than three levels written directly: the crossover,
+ * its cross-block filter state, the per-band gains and the VAD gate are all
+ * real code with real constants, and writing bands straight into the shared
+ * values would leave every one of them unexecuted. The signal is three
+ * formant-ish tones plus a breath of noise, gated by the same syllable /
+ * phrase envelope as `useFakeLevel`, so the three bands actually differ
+ * from one another instead of moving as one.
+ */
+function useFakeBands(active: boolean) {
+  const levels = useVoiceLevels({ sampleRate: RATE });
+  const { setSamples, reset } = levels;
+
+  useEffect(() => {
+    if (!active) {
+      reset();
+      return;
+    }
+    const buf = new Float32Array(BLOCK);
+    let n = 0;
+    const id = setInterval(() => {
+      const base = n / RATE;
+      const syllable = 0.5 + 0.5 * Math.sin(base * 13.0);
+      const phrase = 0.5 + 0.5 * Math.sin(base * 1.7 + 0.9);
+      const breath = Math.sin(base * 0.55) > -0.75 ? 1 : 0;
+      const env = syllable * (0.35 + 0.65 * phrase) * breath;
+      for (let i = 0; i < BLOCK; i += 1) {
+        const s = (n + i) / RATE;
+        buf[i] =
+          env *
+          (0.6 * Math.sin(2 * Math.PI * 120 * s) +
+            0.3 * Math.sin(2 * Math.PI * 850 * s) +
+            0.1 * (Math.random() * 2 - 1));
+      }
+      n += BLOCK;
+      setSamples(buf, RATE);
+    }, 32);
+    return () => clearInterval(id);
+  }, [active, setSamples, reset]);
+
+  return levels;
+}
+
 export function VoiceScreen({ dark }: { dark: boolean }) {
   const [state, setState] = useState<VoiceOrbState>('listening');
 
@@ -63,6 +118,8 @@ export function VoiceScreen({ dark }: { dark: boolean }) {
   // other one anyway, so there is no point burning a frame callback on it.
   const input = useFakeLevel(state === 'listening');
   const output = useFakeLevel(state === 'speaking');
+  const inputBands = useFakeBands(state === 'listening');
+  const outputBands = useFakeBands(state === 'speaking');
 
   const fg = dark ? '#fafafa' : '#0b0b0c';
   const mutedFg = dark ? '#8a8a8f' : '#6b6b70';
@@ -78,6 +135,8 @@ export function VoiceScreen({ dark }: { dark: boolean }) {
           size={180}
           inputAmplitude={input}
           outputAmplitude={output}
+          inputLevels={inputBands}
+          outputLevels={outputBands}
         />
         <Text style={[styles.stageLabel, { color: fg }]}>{state}</Text>
         <Text style={[styles.stageHint, { color: mutedFg }]}>

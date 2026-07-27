@@ -35,6 +35,11 @@ const DEFAULT_SAMPLE_RATE = 16_000;
  * without correction the mid and high bands would never leave the bottom
  * of their range and the ripple and ink terms would be invisible. These
  * bring all three into a comparable 0–1 range for the same voice.
+ *
+ * PROVISIONAL. Derived from that ratio, not measured against a real
+ * microphone — no signal has been through this hook yet. Check the band
+ * values against live speech before treating them as tuned: if they pin at
+ * 1.0, the orb has no dynamic range left and these are the numbers to cut.
  */
 const LOW_GAIN = 3.2;
 const MID_GAIN = 9;
@@ -46,6 +51,9 @@ const HIGH_GAIN = 22;
  * chatters on and off between syllables, and the orb flickers with it.
  * Once speech opens the gate it stays open until the level falls well
  * below where it opened.
+ *
+ * PROVISIONAL, like the gains above — these thresholds are relative to a
+ * noise floor nobody has measured here.
  */
 const VAD_OPEN = 0.06;
 const VAD_CLOSE = 0.025;
