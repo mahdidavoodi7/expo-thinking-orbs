@@ -360,7 +360,14 @@ export function buildVoice(
   // for every behaviour: a state change must never alter the accumulated
   // yaw, or blending would whip the shell round. Bounded shear rides on top.
   const R = (size / 2) * 0.874;
-  const pt = makeProj(t * 0.18 + dyn.yaw, 0.38 + dyn.pitch, cx, cy, 1);
+  const pt = makeProj(
+    t * 0.18 + dyn.yaw,
+    0.38 + dyn.pitch,
+    cx,
+    cy,
+    1,
+    dyn.roll
+  );
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const rBase = o.rBase ?? 0.6;
   const rDepth = o.rDepth ?? 1.7;

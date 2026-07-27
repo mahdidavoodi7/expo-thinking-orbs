@@ -60,6 +60,12 @@ export interface ModeDynamics {
   yaw: number;
   /** Extra pitch in radians, added to the mode's own tilt. Same contract. */
   pitch: number;
+  /**
+   * Extra roll in radians about the VIEW axis — leans the globe's pole
+   * sideways on screen. Independent of `yaw`/`pitch`: it is applied after
+   * projection and does not touch depth.
+   */
+  roll: number;
 }
 
 /**

@@ -178,7 +178,14 @@ export function buildGlobe(
   const cy = size / 2;
   const radius = (size / 2) * 0.82;
   const tilt = 0.4 + 0.06 * Math.sin(t * 0.35);
-  const pt = makeProj(t * spin + dyn.yaw, tilt + dyn.pitch, cx, cy, radius);
+  const pt = makeProj(
+    t * spin + dyn.yaw,
+    tilt + dyn.pitch,
+    cx,
+    cy,
+    radius,
+    dyn.roll
+  );
   // scan sweeps relative to the spin; scanMul scales that relative rate
   const scan = t * (spin + (1.7 - spin) * (o.scanMul ?? 1));
   const rs = radiusScale(size, o.rsPow ?? 0.6);
@@ -242,7 +249,8 @@ export function buildRubik(
     0.35 + 0.1 * Math.sin(t * 0.9) + dyn.pitch,
     cx,
     cy,
-    R
+    R,
+    dyn.roll
   );
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const sc = solveCycle(t, s.moves.length, 0.42, 1.2);
@@ -326,7 +334,14 @@ export function buildWave(
   // 0.76 base × 1.15 — the undulation pulls the sphere inward, so wave
   // read ~15% smaller than the other lattice modes; scaled up to match
   const R = (size / 2) * 0.874;
-  const pt = makeProj(t * 0.18 + dyn.yaw, 0.38 + dyn.pitch, cx, cy, 1);
+  const pt = makeProj(
+    t * 0.18 + dyn.yaw,
+    0.38 + dyn.pitch,
+    cx,
+    cy,
+    1,
+    dyn.roll
+  );
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const rBase = o.rBase ?? 0.6;
   const rDepth = o.rDepth ?? 1.7;

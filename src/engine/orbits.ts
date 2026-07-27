@@ -96,7 +96,7 @@ export function buildOrbits(
   const cx = size / 2;
   const cy = size / 2;
   const R = (size / 2) * 0.82;
-  const pt = makeProj(t * 0.12 + dyn.yaw, 0.3 + dyn.pitch, cx, cy, 1);
+  const pt = makeProj(t * 0.12 + dyn.yaw, 0.3 + dyn.pitch, cx, cy, 1, dyn.roll);
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const ghostR = (o.ghostR ?? 0.9) * rs;
   const ghostA = o.ghostA ?? 0.5;

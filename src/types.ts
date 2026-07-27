@@ -61,10 +61,16 @@ export interface OrbBands {
  * no rotation.
  */
 export interface OrbTilt {
-  /** Yaw — spins the globe about its vertical axis. */
+  /** Yaw — spins the globe about its own pole. The pole stays put. */
   yaw?: SharedValue<number> | number;
   /** Pitch — tips the pole toward or away from the viewer. */
   pitch?: SharedValue<number> | number;
+  /**
+   * Roll — leans the pole sideways on screen, about the view axis. The
+   * third independent axis: `yaw` turns the globe under a fixed pole,
+   * `pitch` tips that pole away from you, and `roll` tips it left or right.
+   */
+  roll?: SharedValue<number> | number;
 }
 
 /** Props for the ThinkingOrb component. */

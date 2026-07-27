@@ -148,10 +148,10 @@ export function useVoiceLevels(
   const open = useRef(false);
 
   const reset = useCallback(() => {
-    level.value = 0;
-    low.value = 0;
-    mid.value = 0;
-    high.value = 0;
+    level.set(0);
+    low.set(0);
+    mid.set(0);
+    high.set(0);
     lp1.current = 0;
     lp2.current = 0;
     open.current = false;
@@ -206,10 +206,10 @@ export function useVoiceLevels(
       if (!open.current) {
         // A target of 0, not a freeze: the orb's release filter carries the
         // shell down rather than dropping it.
-        level.value = 0;
-        low.value = 0;
-        mid.value = 0;
-        high.value = 0;
+        level.set(0);
+        low.set(0);
+        mid.set(0);
+        high.set(0);
         return;
       }
 
@@ -218,10 +218,10 @@ export function useVoiceLevels(
         return Number.isNaN(c) ? 0 : c ** curve;
       };
 
-      low.value = shape(rLow);
-      mid.value = shape(rMid);
-      high.value = shape(rHigh);
-      level.value = shape(raw > 1 ? 1 : raw);
+      low.set(shape(rLow));
+      mid.set(shape(rMid));
+      high.set(shape(rHigh));
+      level.set(shape(raw > 1 ? 1 : raw));
     },
     [level, low, mid, high, curve, defaultRate, reset]
   );

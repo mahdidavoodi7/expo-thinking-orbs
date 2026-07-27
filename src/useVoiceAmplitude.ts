@@ -85,7 +85,7 @@ export function useVoiceAmplitude(
     (value: number) => {
       // `!(v > 0)` rather than `v < 0` so a NaN from a stalled meter lands
       // on silence instead of poisoning every dot coordinate.
-      level.value = !(value > 0) ? 0 : value > 1 ? 1 : value;
+      level.set(!(value > 0) ? 0 : value > 1 ? 1 : value);
     },
     [level]
   );
@@ -93,12 +93,12 @@ export function useVoiceAmplitude(
   const setDb = useCallback(
     (db: number) => {
       if (Number.isNaN(db)) {
-        level.value = 0;
+        level.set(0);
         return;
       }
       const norm = (db - floorDb) / -floorDb;
       const clamped = norm < 0 ? 0 : norm > 1 ? 1 : norm;
-      level.value = clamped ** curve;
+      level.set(clamped ** curve);
     },
     [level, floorDb, curve]
   );
@@ -107,7 +107,7 @@ export function useVoiceAmplitude(
     (samples: ArrayLike<number>) => {
       const n = samples.length;
       if (n === 0) {
-        level.value = 0;
+        level.set(0);
         return;
       }
       let sum = 0;
@@ -119,7 +119,7 @@ export function useVoiceAmplitude(
       // RMS of speech is far below its peak, so a raw RMS barely moves the
       // orb. The same curve as setDb, over a headroom-adjusted range.
       const norm = Math.min(1, rms * 3.2);
-      level.value = Number.isNaN(norm) ? 0 : norm ** curve;
+      level.set(Number.isNaN(norm) ? 0 : norm ** curve);
     },
     [level, curve]
   );
