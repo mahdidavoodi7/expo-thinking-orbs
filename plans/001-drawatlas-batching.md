@@ -49,33 +49,57 @@ and colors in **one** call. Target: ~173,000 crossings/sec → ~120/sec.
 Draw one pre-rendered white circle sprite N times via `Canvas.drawAtlas`,
 tinting per dot with the existing LUT color and modulating alpha.
 
+The imperative signature, confirmed against
+`packages/skia/src/skia/types/Canvas.ts` upstream — note the argument order and
+that `srcs` precedes `dsts`:
+
 ```ts
-// target shape — one native call for the whole shell
-canvas.drawAtlas(
-  circleImage,        // SkImage: a white antialiased disc, SPRITE_PX square
-  rsxForms,           // Float32Array, 4 per dot: [scos, ssin, tx, ty]
-  spriteRects,        // Float32Array, 4 per dot: [0, 0, SPRITE_PX, SPRITE_PX]
-  colors,             // Uint32Array, 1 per dot: LUT color with alpha applied
-  BlendMode.Modulate, // tint the white sprite by the per-dot color
-  sampling,           // { filter: FilterMode.Linear, mipmap: MipmapMode.Linear }
-  paint
-);
+drawAtlas(
+  atlas: SkImage,
+  srcs: SkRect[],
+  dsts: SkRSXform[],
+  paint: SkPaint,
+  blendMode?: BlendMode,
+  colors?: SkColor[],
+  sampling?: SamplingOptions
+): void;
 ```
+
+**Read this before designing buffers.** `srcs` and `dsts` are arrays of *native
+objects*, not flat `Float32Array`s. That changes the win: building 480
+`Skia.RSXform(...)` objects per frame is 480 crossings + 480 allocations, which
+is better than the current ~1,440 crossings but is **not** the ~120/sec figure
+quoted in Problem. Two options, and the executor must pick deliberately:
+
+- **(a)** `srcs` is constant (the same sprite rect for every dot), so build it
+  once and cache on `globalThis`. Only `dsts` and `colors` are rebuilt per
+  frame. Expected: ~1,440 crossings → ~480 plus per-frame object churn.
+- **(b)** Use the declarative `Atlas` component with `useRSXformBuffer`, which
+  exists upstream precisely to keep transforms in a flat mutable buffer and
+  avoid the per-frame object allocation. This gets closest to the one-call
+  ideal but does **not** fit the current `recordPicture` → `SkPicture` shape,
+  so it is a larger architectural change to `useThinkingOrbPicture` too.
+
+Start with (a), measure, and only reach for (b) if (a) misses the budget.
 
 Exact constants to use:
 
 - `const SPRITE_PX = 64;` — the sprite is drawn at radius `SPRITE_PX / 2` and
-  scaled down per dot. 64 px covers the largest rendered dot in the preset
-  range without upscaling; see the aliasing boundary below.
+  scaled per dot. **Unverified**: the largest rendered radius across the preset
+  range was not computed. Before settling on 64, instrument `rs[]` and take its
+  max across the preset/size matrix; if any dot exceeds a 32 px radius the
+  sprite is being upscaled and will look soft.
 - RSXform per dot, for a dot of rendered radius `r` at `(x, y)`:
   - `scos = (2 * r) / SPRITE_PX`, `ssin = 0` (no rotation — a disc is
     rotationally symmetric, so never spend a `sin`/`cos` here)
   - `tx = x - r`, `ty = y - r`
 - Color per dot: take `lut[Math.round(w * 255)]` (already an unpremultiplied
   32-bit ARGB int) and replace its alpha byte with `Math.round(alpha * 255)`.
-  Do **not** call `setAlphaf` — alpha rides in the color array.
-- Sampling: `FilterMode.Linear` + `MipmapMode.Linear`. Nearest-neighbour will
-  visibly stair-step the small dots.
+  Do **not** call `setAlphaf` — alpha rides in the `colors` array.
+- Sampling: `FilterMode.Linear` only. Do **not** set `MipmapMode.Linear`:
+  upstream docs give `nearest` as the default for both filter and mipmap, and
+  mipmapped sampling needs a mipmapped image, which `makeImageSnapshot()` on an
+  offscreen surface does not produce. Requesting it is at best ignored.
 
 ## Repo conventions to follow
 
@@ -166,9 +190,18 @@ Exact constants to use:
 - **Performance check** (the point of the plan): this must be measured on a
   **physical ProMotion device**, not the simulator — the simulator has no
   120 Hz mode and renders Skia through a different path. Set
-  `CADisableMinimumFrameDuration: true` (already in `example/app.json`),
-  build to device, and read the `debugFrameMs` shared value that
-  `useThinkingOrbPicture` already exposes (`src/useThinkingOrbPicture.ts:203-223`).
+  `CADisableMinimumFrameDuration: true` (already in `example/app.json`) and
+  build to device.
+  - **Binding criterion**: the on-device perf monitor holds a sustained 120 fps
+    with no dropped frames through a full state cycle.
+  - **Supporting signal only**: the `debugFrameMs` shared value that
+    `useThinkingOrbPicture` exposes (`src/useThinkingOrbPicture.ts:203-223`).
+    Note what it does and does not measure — it times `build()` +
+    `recordPicture()`, i.e. the *recording* pass. The JSI crossings this plan
+    removes do land inside that window, but the GPU cost of *playing back* the
+    resulting `SkPicture` does not. `debugFrameMs` can therefore read
+    comfortably under 8.3 ms while the device still drops frames. Do not treat
+    it as the pass/fail gate.
 - **Done when**: the shell is visually indistinguishable from 596a089 at rest
-  and through a full `connecting → … → speaking` cycle, and `debugFrameMs` on
-  device is below 8.3 ms with margin at 120 Hz.
+  and through a full `connecting → … → speaking` cycle, **and** the device perf
+  monitor sustains 120 fps.
