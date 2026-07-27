@@ -23,6 +23,14 @@ export {
   type VoiceAmplitude,
   type UseVoiceAmplitudeOptions,
 } from './useVoiceAmplitude';
+// Band-split audio: the three-way split that lets the shell follow speech
+// rather than only its volume. Direction-agnostic — one instance for the
+// microphone, one for the agent's playback.
+export {
+  useVoiceLevels,
+  type VoiceLevels,
+  type UseVoiceLevelsOptions,
+} from './useVoiceLevels';
 export {
   VOICE_BUFFERING,
   VOICE_CONNECTING,
@@ -35,7 +43,13 @@ export {
   type VoiceBehaviour,
 } from './engine/voice';
 
-export type { ThinkingOrbProps, OrbState, OrbSize, OrbTheme } from './types';
+export type {
+  ThinkingOrbProps,
+  OrbBands,
+  OrbState,
+  OrbSize,
+  OrbTheme,
+} from './types';
 
 // Power-user surface: resolved presets + the mode registry, for consumers
 // driving their own Skia canvas outside the component.
@@ -51,4 +65,7 @@ export {
 export { MODES } from './engine/registry';
 export { acquireDotBuffer, type DotBuffer } from './engine/scratch';
 export { recordPicture } from './engine/paint';
+// The band-reactive pass, for consumers running their own build → record
+// loop: call it on the filled buffer before recording.
+export { applyVoicePass } from './engine/voice-pass';
 export { buildColorLUT, parseTint, type ColorLUT } from './colors';

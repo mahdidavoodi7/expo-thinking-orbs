@@ -26,7 +26,7 @@ import {
   VOICE_THINKING,
   type VoiceBehaviour,
 } from './engine/voice';
-import type { ThinkingOrbProps } from './types';
+import type { OrbBands, ThinkingOrbProps } from './types';
 import { useThinkingOrbPicture } from './useThinkingOrbPicture';
 
 /**
@@ -108,6 +108,23 @@ export interface VoiceOrbProps extends Omit<
    * and is ignored in every other state.
    */
   outputAmplitude?: SharedValue<number> | number;
+
+  /**
+   * Band-split microphone energy — see {@linkcode useVoiceLevels}, whose
+   * return value passes straight through. Drives the voice pass (swell,
+   * ripple, ink) while `listening`, and is ignored in every other state.
+   *
+   * Optional on top of {@linkcode inputAmplitude}: the amplitude alone
+   * makes the shell breathe with the voice, and the bands are what make it
+   * look like it is following the words rather than only the volume.
+   */
+  inputLevels?: OrbBands;
+
+  /**
+   * Band-split energy of the agent's own audio, driving the voice pass
+   * while `speaking`. Feed it the PCM you are playing back.
+   */
+  outputLevels?: OrbBands;
 }
 
 /**
@@ -128,6 +145,8 @@ export function VoiceOrb({
   state = 'idle',
   inputAmplitude,
   outputAmplitude,
+  inputLevels,
+  outputLevels,
   size = 64,
   paused = false,
   accessibilityLabel,
@@ -144,11 +163,23 @@ export function VoiceOrb({
         ? outputAmplitude
         : undefined;
 
+  // The bands follow the same direction as the amplitude, for the same
+  // reason: only one of the two is ever the thing being heard. Dropping
+  // them outside those states also means the pass switches itself off
+  // between turns instead of animating the last thing that was said.
+  const bands =
+    state === 'listening'
+      ? inputLevels
+      : state === 'speaking'
+        ? outputLevels
+        : undefined;
+
   const picture = useThinkingOrbPicture({
     ...rest,
     size,
     paused: paused || FROZEN.has(state),
     amplitude,
+    bands,
     voice: VOICE_STATE_TO_BEHAVIOUR[state],
   });
 

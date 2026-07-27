@@ -41,10 +41,36 @@ export type OrbSize = 64 | 20;
  */
 export type OrbTheme = 'auto' | 'dark' | 'light';
 
+/**
+ * The three band levels the voice pass reads, each 0–1 — see
+ * `useVoiceLevels`, whose return value satisfies this shape directly.
+ * Plain numbers are accepted alongside `SharedValue`s so a static or test
+ * value needs no shared-value ceremony.
+ */
+export interface OrbBands {
+  /** Sub-250 Hz energy. Swells the shell. */
+  low?: SharedValue<number> | number;
+  /** 250 Hz–2 kHz energy. Drives the travelling ripple. */
+  mid?: SharedValue<number> | number;
+  /** 2 kHz+ energy. Darkens the ink. */
+  high?: SharedValue<number> | number;
+}
+
 /** Props for the ThinkingOrb component. */
 export interface ThinkingOrbProps {
   /** Which animation to show. @default 'working' */
   state?: OrbState;
+
+  /**
+   * Band-split audio driving the voice pass — swell from `low`, a
+   * travelling ripple from `mid`, ink from `high`.
+   *
+   * This is the one audio input the six ported animations DO respond to.
+   * The pass runs over the finished dot cloud rather than inside a mode,
+   * so `working` or `composing` can follow a microphone without becoming
+   * the voice shell. Omit it and every mode paints its original pose.
+   */
+  bands?: OrbBands;
 
   /**
    * Rendered size in points. Any number — the nearer of the two tuned

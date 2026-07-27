@@ -23,10 +23,11 @@ import { buildColorLUT } from './colors';
 import { recordPicture } from './engine/paint';
 import { MODES } from './engine/registry';
 import { acquireDotBuffer, acquireDynamics } from './engine/scratch';
+import { applyVoicePass } from './engine/voice-pass';
 import type { VoiceBehaviour } from './engine/voice';
 import { pickDesignSize, resolvePreset, resolveVoicePreset } from './presets';
 import { useResolvedDark } from './theme';
-import type { ThinkingOrbProps } from './types';
+import type { OrbBands, ThinkingOrbProps } from './types';
 
 // Cap the per-frame delta so a pause/resume or a dropped-frame hitch
 // advances the phase by at most a few frames instead of the whole gap —
@@ -72,6 +73,35 @@ const ATTACK_MS = 45;
 const RELEASE_MS = 240;
 
 /**
+ * One frame of the band filter: the same fast-attack / slow-release
+ * one-pole the overall level uses, with the same "losing the source is a
+ * target of 0, not an assignment of 0" rule so a band releases instead of
+ * snapping when its source goes away.
+ *
+ * Returns `cur` untouched when there is no source and the band has already
+ * settled — the cheap path every non-audio caller takes every frame.
+ */
+function filterBand(
+  cur: number,
+  sv: SharedValue<number> | undefined,
+  dt: number
+): number {
+  'worklet';
+  if (sv == null && cur === 0) return 0;
+  let a = 0;
+  if (sv != null) {
+    // The SharedValue belongs to the caller; a NaN here would reach every
+    // dot coordinate through the voice pass.
+    a = sv.value;
+    if (!(a > 0)) a = 0;
+    else if (a > 1) a = 1;
+  }
+  const tau = a > cur ? ATTACK_MS : RELEASE_MS;
+  const next = cur + (a - cur) * (1 - Math.exp(-dt / tau));
+  return a === 0 && next < 1e-4 ? 0 : next;
+}
+
+/**
  * Options for {@linkcode useThinkingOrbPicture} — the animation subset of
  * {@linkcode ThinkingOrbProps} (everything except the container-only
  * `style` and `accessibilityLabel`).
@@ -97,6 +127,18 @@ export type UseThinkingOrbPictureOptions = Omit<
    * release), so feed a raw meter without pre-smoothing.
    */
   amplitude?: SharedValue<number> | number;
+
+  /**
+   * Three smoothed audio bands driving the voice pass — swell from `low`,
+   * a travelling ripple from `mid`, ink from `high`. See
+   * {@linkcode useVoiceLevels}, which produces them from raw PCM.
+   *
+   * Unlike {@linkcode amplitude} this is NOT voice-only: the pass runs
+   * over the finished dot cloud, so it composes with all six ported
+   * animations as well as the voice shell. Omit it, or leave the bands at
+   * zero, and every mode paints exactly the pose it built.
+   */
+  bands?: OrbBands;
 };
 
 /**
@@ -123,6 +165,7 @@ export function useThinkingOrbPicture({
   paused = false,
   color,
   amplitude,
+  bands,
   voice,
   debugFrameMs,
 }: UseThinkingOrbPictureOptions = {}): DerivedValue<SkPicture> {
@@ -161,9 +204,36 @@ export function useThinkingOrbPicture({
   }, [amplitude, ownAmpSV]);
   const ampSV = typeof amplitude === 'number' ? ownAmpSV : amplitude;
 
+  // Same number-or-SharedValue handling for each band. Three own-values are
+  // allocated unconditionally: hooks cannot be called per present band, and
+  // an unused SharedValue is a single UI-thread slot.
+  const ownLowSV = useSharedValue(0);
+  const ownMidSV = useSharedValue(0);
+  const ownHighSV = useSharedValue(0);
+  const bLow = bands?.low;
+  const bMid = bands?.mid;
+  const bHigh = bands?.high;
+  useEffect(() => {
+    if (typeof bLow === 'number') ownLowSV.value = bLow;
+    if (typeof bMid === 'number') ownMidSV.value = bMid;
+    if (typeof bHigh === 'number') ownHighSV.value = bHigh;
+  }, [bLow, bMid, bHigh, ownLowSV, ownMidSV, ownHighSV]);
+  const lowSV = typeof bLow === 'number' ? ownLowSV : bLow;
+  const midSV = typeof bMid === 'number' ? ownMidSV : bMid;
+  const highSV = typeof bHigh === 'number' ? ownHighSV : bHigh;
+
   // The smoothed level, 0–1, read per dot by the voice shell. Losing the
   // amplitude source is a release, not a reset — see the frame callback.
   const level = useSharedValue(0);
+
+  // The three band levels, smoothed through the same filter as `level` but
+  // consumed by the voice pass (`engine/voice-pass.ts`) rather than by the
+  // shell. Unlike `amplitude`, these apply to EVERY mode: the pass runs
+  // over the finished dot cloud, so a caller can make any of the six
+  // ported animations audio-reactive without switching to the voice shell.
+  const bandLow = useSharedValue(0);
+  const bandMid = useSharedValue(0);
+  const bandHigh = useSharedValue(0);
 
   // Voice behaviour blending. `from`/`to` are behaviour indices and `mix`
   // walks 0 → 1 across a state change; the mode evaluates both and
@@ -231,6 +301,13 @@ export function useThinkingOrbPicture({
       // exactly to 0 — otherwise the branch above can never switch off.
       level.value = a === 0 && next < 1e-4 ? 0 : next;
     }
+
+    // The three bands run the same filter, each with the same guard: a band
+    // with no source and a settled 0 costs nothing, which is what keeps the
+    // six ported modes untouched for callers who drive no audio.
+    bandLow.value = filterBand(bandLow.value, lowSV, dt);
+    bandMid.value = filterBand(bandMid.value, midSV, dt);
+    bandHigh.value = filterBand(bandHigh.value, highSV, dt);
   }, false);
 
   useEffect(() => {
@@ -259,6 +336,23 @@ export function useThinkingOrbPicture({
     // instead would be a harder visual event than the travel it replaces.
     const dyn = acquireDynamics(amp, behFrom.value, behTo.value, mix.value);
     build(buf, size, t, opts, staticData, dyn);
+    // The voice pass runs on the BUILT cloud, which is what lets it apply
+    // to every mode rather than to the voice shell alone. Under reduced
+    // motion the bands are zeroed rather than held at a representative
+    // value: unlike the shell — where motion IS the state signal, so
+    // freezing destroys it (see REDUCED_AMP) — this pass carries no state,
+    // and holding it at a constant would only add a permanent swell and a
+    // frozen ripple to a setting that asked for less movement.
+    if (!reduced) {
+      applyVoicePass(
+        buf,
+        size,
+        t,
+        bandLow.value,
+        bandMid.value,
+        bandHigh.value
+      );
+    }
     const pic = recordPicture(buf, size, lut, rMin);
     if (timed && perf && debugFrameMs != null) {
       debugFrameMs.value = perf.now() - t0;
