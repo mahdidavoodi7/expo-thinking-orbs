@@ -12,9 +12,16 @@ import { BASE_PROFILES, scaleCounts, scaleRadii } from './engine/profiles';
 import type { OrbSize, OrbState } from './types';
 
 export type ModeKey =
-  'orbits' | 'globe' | 'rubik' | 'wave' | 'ribbon' | 'morph';
+  'orbits' | 'globe' | 'rubik' | 'wave' | 'ribbon' | 'morph' | 'voice';
 
-export const STATE_TO_MODE: Record<OrbState, ModeKey> = {
+/**
+ * The modes reachable from an {@linkcode OrbState}. `voice` is excluded by
+ * construction: it is not a state's animation but the voice shell, driven
+ * by a behaviour instead — see `resolveVoicePreset`.
+ */
+export type StateModeKey = Exclude<ModeKey, 'voice'>;
+
+export const STATE_TO_MODE: Record<OrbState, StateModeKey> = {
   working: 'orbits',
   searching: 'globe',
   solving: 'rubik',
@@ -43,7 +50,7 @@ interface Preset {
   extra?: ModeOpts;
 }
 
-const PRESETS: Record<ModeKey, Record<OrbSize, Preset>> = {
+const PRESETS: Record<StateModeKey, Record<OrbSize, Preset>> = {
   orbits: {
     64: { speed: 1.885, count: 1, size: 1 },
     20: { speed: 3.9, count: 0.238, size: 2.4 },
@@ -90,6 +97,18 @@ const PRESETS: Record<ModeKey, Record<OrbSize, Preset>> = {
   },
 };
 
+/**
+ * The voice shell. ONE row per design size, shared by all five voice
+ * behaviours — deliberately, not for brevity: blending two behaviours
+ * requires them to agree on the dot set, so the profile has to be
+ * identical across states. What differs between voice states lives in the
+ * behaviour, not here.
+ */
+const VOICE_PRESETS: Record<OrbSize, Preset> = {
+  64: { speed: 1.0, count: 0.58, size: 1.05 },
+  20: { speed: 0.95, count: 0.14, size: 1.7 },
+};
+
 export interface Resolved {
   mode: ModeKey;
   speed: number;
@@ -116,6 +135,28 @@ export function resolvePreset(state: OrbState, designSize: OrbSize): Resolved {
   if (preset.extra) opts = { ...opts, ...preset.extra };
 
   const resolved: Resolved = { mode, speed: preset.speed, opts };
+  cache.set(key, resolved);
+  return resolved;
+}
+
+/**
+ * Resolve the voice shell for a design size. Every voice state shares
+ * this, so the returned object is reference-stable across state changes —
+ * which is what lets the render loop keep its dot buffer, its precomputed
+ * shell and its clock while a behaviour blend is in flight.
+ */
+export function resolveVoicePreset(designSize: OrbSize): Resolved {
+  const key = `voice-${designSize}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+
+  const preset = VOICE_PRESETS[designSize];
+  let opts: ModeOpts = { ...BASE_PROFILES.voice };
+  if (preset.count !== 1) opts = scaleCounts(opts, preset.count);
+  if (preset.size !== 1) opts = scaleRadii(opts, preset.size);
+  if (preset.extra) opts = { ...opts, ...preset.extra };
+
+  const resolved: Resolved = { mode: 'voice', speed: preset.speed, opts };
   cache.set(key, resolved);
   return resolved;
 }

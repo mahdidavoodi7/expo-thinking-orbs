@@ -29,6 +29,46 @@ export interface ModeStaticData {
 export type ModePrecompute = (opts: ModeOpts) => ModeStaticData;
 
 /**
+ * The per-frame inputs that are NOT fixed by the preset — the live audio
+ * level and, for the voice mode, which behaviour is being blended into
+ * which. Passed as one object (a reused per-runtime scratch, never
+ * allocated per frame) so modes can grow inputs without changing every
+ * signature.
+ *
+ * The six ported modes ignore this entirely.
+ */
+export interface ModeDynamics {
+  /** Smoothed audio level, 0–1. `0` when no amplitude is being driven. */
+  amp: number;
+  /** Behaviour index being blended FROM (see `voice.ts`). */
+  from: number;
+  /** Behaviour index being blended TO. */
+  to: number;
+  /** Blend position: 0 = fully `from`, 1 = fully `to`. */
+  mix: number;
+  /**
+   * Extra yaw in radians, added to whatever rotation the mode already
+   * applies. Meant for device orientation: because it enters the
+   * PROJECTION rather than being a transform on the rendered view, the far
+   * side of the globe genuinely rotates into sight. A transform on the
+   * container can only skew the finished 2-D picture, which reads as a
+   * tilted photograph of a sphere rather than a sphere being tilted.
+   *
+   * `0` when nothing is driving it — every mode adds it unconditionally,
+   * and adding zero is free.
+   */
+  yaw: number;
+  /** Extra pitch in radians, added to the mode's own tilt. Same contract. */
+  pitch: number;
+  /**
+   * Extra roll in radians about the VIEW axis — leans the globe's pole
+   * sideways on screen. Independent of `yaw`/`pitch`: it is applied after
+   * projection and does not touch depth.
+   */
+  roll: number;
+}
+
+/**
  * One frame: fills `buf` (already reset to `count` 0) with the mode's dot
  * cloud at time `t` for the given rendered `size`. A Reanimated worklet —
  * it may only touch its parameters plus module-level worklet helpers.
@@ -38,7 +78,8 @@ export type ModeBuild = (
   size: number,
   t: number,
   opts: ModeOpts,
-  staticData: any
+  staticData: any,
+  dyn: ModeDynamics
 ) => void;
 
 export interface ModeImpl {

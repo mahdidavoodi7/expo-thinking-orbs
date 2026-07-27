@@ -11,6 +11,12 @@ import type { SharedValue } from 'react-native-reanimated';
  * - `listening` — a waveform rolls through latitude rings
  * - `composing` — an undulating multi-band sash
  * - `shaping`   — a dotted outline morphs circle → triangle → square
+ *
+ * Voice agents have their own vocabulary and their own animation — see
+ * {@linkcode VoiceOrb} and `VoiceOrbState`. They are deliberately a
+ * separate axis: `listening` means something different to a voice agent
+ * than it does here, and these six are a faithful port that should not
+ * shift under anyone.
  */
 export type OrbState =
   'working' | 'searching' | 'solving' | 'listening' | 'composing' | 'shaping';
@@ -35,10 +41,105 @@ export type OrbSize = 64 | 20;
  */
 export type OrbTheme = 'auto' | 'dark' | 'light';
 
+/**
+ * The three band levels the voice pass reads, each 0–1 — see
+ * `useVoiceLevels`, whose return value satisfies this shape directly.
+ * Plain numbers are accepted alongside `SharedValue`s so a static or test
+ * value needs no shared-value ceremony.
+ */
+export interface OrbBands {
+  /** Sub-250 Hz energy. Swells the shell. */
+  low?: SharedValue<number> | number;
+  /** 250 Hz–2 kHz energy. Drives the travelling ripple. */
+  mid?: SharedValue<number> | number;
+  /** 2 kHz+ energy. Darkens the ink. */
+  high?: SharedValue<number> | number;
+}
+
+/**
+ * Extra globe rotation in radians. Both axes are optional and default to
+ * no rotation.
+ */
+export interface OrbTilt {
+  /** Yaw — spins the globe about its own pole. The pole stays put. */
+  yaw?: SharedValue<number> | number;
+  /** Pitch — tips the pole toward or away from the viewer. */
+  pitch?: SharedValue<number> | number;
+  /**
+   * Roll — leans the pole sideways on screen, about the view axis. The
+   * third independent axis: `yaw` turns the globe under a fixed pole,
+   * `pitch` tips that pole away from you, and `roll` tips it left or right.
+   */
+  roll?: SharedValue<number> | number;
+}
+
 /** Props for the ThinkingOrb component. */
 export interface ThinkingOrbProps {
   /** Which animation to show. @default 'working' */
   state?: OrbState;
+
+  /**
+   * Band-split audio driving the voice pass — swell from `low`, a
+   * travelling ripple from `mid`, ink from `high`.
+   *
+   * This is the one audio input the six ported animations DO respond to.
+   * The pass runs over the finished dot cloud rather than inside a mode,
+   * so `working` or `composing` can follow a microphone without becoming
+   * the voice shell. Omit it and every mode paints its original pose.
+   */
+  bands?: OrbBands;
+
+  /**
+   * A second ink endpoint. Supplying it turns `color` into a gradient the
+   * dots move along instead of a single hue, and is what enables every
+   * colour animation below — with no `colorTo` the painter takes the
+   * original single-ramp path verbatim.
+   */
+  colorTo?: string;
+
+  /**
+   * Where the cloud sits between `color` (0) and `colorTo` (1).
+   *
+   * Omit it and the orb drives it from its own clock, drifting back and
+   * forth over {@linkcode ThinkingOrbProps.colorCycleMs}. Supply a
+   * `SharedValue` to drive it yourself — from a gesture, a scroll offset,
+   * a device tilt — at frame rate, without re-rendering React.
+   */
+  colorShift?: SharedValue<number> | number;
+
+  /**
+   * How far a dot's own depth offsets its blend, 0–1.
+   *
+   * At 0 the whole shell is one colour that drifts as a mass. Higher
+   * values fan near and far dots apart along the gradient, so the orb has
+   * colour depth rather than looking like a flat disc changing hue.
+   * @default 0.6
+   */
+  colorSpread?: number;
+
+  /**
+   * Period of the built-in colour drift, in ms. Ignored when `colorShift`
+   * is supplied. Slow by default — a colour cycle that reads as motion
+   * competes with the animation it is colouring.
+   * @default 9000
+   */
+  colorCycleMs?: number;
+
+  /**
+   * Rotate the orb as a globe, in radians, on top of whatever rotation its
+   * animation is already doing.
+   *
+   * This enters the PROJECTION, so the far side genuinely turns into
+   * sight — dots on the leading edge sweep away, hidden ones come round.
+   * That is the difference between this and a `rotateX`/`rotateY` transform
+   * on the view: a transform skews the finished flat picture, which reads
+   * as a tilted photograph of a sphere rather than a sphere being turned.
+   *
+   * Intended for device orientation, but it is just an angle — a drag, a
+   * scroll offset or a spring works identically. Use `SharedValue`s so it
+   * can be driven per frame without re-rendering React.
+   */
+  tilt?: OrbTilt;
 
   /**
    * Rendered size in points. Any number — the nearer of the two tuned

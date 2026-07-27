@@ -10,6 +10,8 @@
 // inside one invocation, so a shared buffer can never interleave between
 // orbs.
 
+import type { ModeDynamics } from './types';
+
 /**
  * Structure-of-arrays dot storage filled by a mode's `build` function
  * each frame and consumed by `recordPicture`.
@@ -39,6 +41,39 @@ export interface DotBuffer {
 
 interface ScratchGlobal {
   __expoThinkingOrbsScratch?: DotBuffer;
+  __expoThinkingOrbsDyn?: ModeDynamics;
+}
+
+/**
+ * Return the runtime's shared {@linkcode ModeDynamics} record, with the
+ * given per-frame values written into it. Reused rather than allocated so
+ * a frame still allocates only the picture itself.
+ */
+export function acquireDynamics(
+  amp: number,
+  from: number,
+  to: number,
+  mix: number,
+  yaw: number = 0,
+  pitch: number = 0,
+  roll: number = 0
+): ModeDynamics {
+  'worklet';
+  const g = globalThis as ScratchGlobal;
+  let d = g.__expoThinkingOrbsDyn;
+  if (d === undefined) {
+    d = { amp, from, to, mix, yaw, pitch, roll };
+    g.__expoThinkingOrbsDyn = d;
+    return d;
+  }
+  d.amp = amp;
+  d.from = from;
+  d.to = to;
+  d.mix = mix;
+  d.yaw = yaw;
+  d.pitch = pitch;
+  d.roll = roll;
+  return d;
 }
 
 /**

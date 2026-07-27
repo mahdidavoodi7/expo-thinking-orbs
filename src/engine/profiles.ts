@@ -127,4 +127,18 @@ export const BASE_PROFILES: Record<string, ModeOpts> = {
     iconD: 1,
     rMin: 0.25,
   },
+  // Not a ported profile — the voice shell. One row for all five voice
+  // states; the behaviour, not the profile, is what differs between them.
+  // Same lat/long lattice and the same radius/ink constants as `wave`, so
+  // the voice orb sits in the same visual family as the ported six.
+  voice: {
+    latRings: 17,
+    lonDensity: 42,
+    rBase: 0.6,
+    rDepth: 1.7,
+    inkFar: 0.66,
+    inkSpan: 0.56,
+    rsPow: 0.6,
+    rMin: 0.3,
+  },
 };
