@@ -69,17 +69,21 @@ export interface ModeDynamics {
    */
   roll: number;
   /**
-   * The globe's own orientation, applied to each point BEFORE `yaw`,
-   * `pitch` and `roll`. `null` when nothing is driving it.
+   * The globe's own orientation, applied to each point AFTER `yaw` and
+   * `pitch` and before `roll` — that is, in the viewer's frame. `null` when
+   * nothing is driving it.
    *
-   * This is the difference between turning the globe and turning the
-   * camera. The three angles above are camera-side — the mode's idle spin
-   * and the device's parallax — and they compose by addition because each
-   * is a small independent nudge about a fixed axis. An orientation cannot
-   * work that way: adding Euler angles is not composing rotations, so a
-   * caller wanting "spin the globe about whatever axis this force implies,
-   * from wherever it currently is" has no way to express it through them.
-   * A matrix does, and it costs nine multiplies per dot only when supplied.
+   * The three angles above compose by addition because each is a small
+   * independent nudge about a fixed axis. An orientation cannot work that
+   * way: adding Euler angles is not composing rotations, so a caller wanting
+   * "spin the globe about whatever axis this force implies, from wherever it
+   * currently is" has no way to express it through them. A matrix does, and
+   * it costs nine multiplies per dot only when supplied.
+   *
+   * The placement is part of the contract, not an implementation detail:
+   * `yaw` carries the mode's idle spin, which grows with elapsed time, so
+   * applying the orientation first would conjugate the caller's axes by it
+   * and a steady request would drift into a different one and back.
    */
   orient: Mat3 | null;
 }
