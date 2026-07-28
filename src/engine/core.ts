@@ -123,12 +123,16 @@ export function angleDelta(a: number, b: number): number {
  * `roll` leaves `z` alone — a rotation about the view axis cannot change
  * depth — so the painter's z-sort is unaffected.
  *
- * An optional `orient` rotates the model point BEFORE any of the above, so a
- * caller can hand the globe a real orientation — a ball in space, spun about
- * whatever axis a force implies — while the three angles above keep their
- * existing meanings on top of it: the engine's own idle spin, and a bounded
- * view-space parallax. Adding Euler angles cannot express that; composing a
- * rotation can.
+ * An optional `orient` rotates the result AFTER `yaw` and `tilt`, in the
+ * viewer's own frame — screen x right, screen y up, depth toward the eye. That
+ * lets a caller hand the globe a real orientation: a ball in space, spun about
+ * whatever axis a force implies, from wherever it already lies. Adding Euler
+ * angles cannot express that; composing a rotation can.
+ *
+ * It goes after rather than before deliberately. `yaw` here is the mode's own
+ * idle spin, which grows with elapsed time; rotating the ball before it would
+ * conjugate the caller's axes by that spin, and a request to tip the globe
+ * toward the viewer would drift into an in-plane roll and back again.
  */
 export function makeProj(
   yaw: number,
@@ -158,24 +162,40 @@ export function makeProj(
   const m21 = orient === null ? 0 : orient[7];
   const m22 = orient === null ? 0 : orient[8];
   return (x0, y0, z0, out) => {
-    // The orientation turns the BALL; everything below turns the camera and
-    // the engine's own idle spin around it. Skipped entirely when absent —
-    // nine multiplies per dot per frame is not free at 120 Hz, and the
-    // overwhelming majority of callers never pass one.
-    const x = orient === null ? x0 : m00 * x0 + m01 * y0 + m02 * z0;
-    const y = orient === null ? y0 : m10 * x0 + m11 * y0 + m12 * z0;
-    const z = orient === null ? z0 : m20 * x0 + m21 * y0 + m22 * z0;
-    const x1 = x * cyw + z * sy;
-    const z1 = -x * sy + z * cyw;
-    const y1 = y * ct - z1 * st;
-    const z2 = y * st + z1 * ct;
+    const x1 = x0 * cyw + z0 * sy;
+    const z1 = -x0 * sy + z0 * cyw;
+    const y1 = y0 * ct - z1 * st;
+    const z2 = y0 * st + z1 * ct;
+    // The orientation lands LAST of the three-dimensional steps, and that
+    // placement is the whole contract rather than an implementation detail.
+    //
+    // Everything above is the mode's own motion — an idle spin about the
+    // globe's pole that never stops. Rotating the ball before it means the
+    // caller's axes get conjugated by that spin: a rotation about x̂, seen
+    // through a later y-rotation of φ, is a rotation about (cos φ, 0, −sin φ).
+    // φ grows without bound because it is driven by elapsed time, so a caller
+    // asking for "tip it toward me" would get a tip that slowly turns into an
+    // in-plane roll and back, on a period nobody chose.
+    //
+    // Applied here, the orientation is in the SAME frame the viewer is in:
+    // screen x to the right, screen y up, depth toward the eye. A drag right
+    // turns the ball about ŷ and stays turning about ŷ, whatever the mode is
+    // doing underneath and however far the ball has already been turned.
+    //
+    // Skipped entirely when absent — nine multiplies per dot per frame is not
+    // free at 120 Hz, and the overwhelming majority of callers never pass one.
+    const xo = orient === null ? x1 : m00 * x1 + m01 * y1 + m02 * z2;
+    const yo = orient === null ? y1 : m10 * x1 + m11 * y1 + m12 * z2;
+    const zo = orient === null ? z2 : m20 * x1 + m21 * y1 + m22 * z2;
     // Skip the rotation entirely when level — the overwhelmingly common
     // case, and two multiplies per dot per frame is not free at 120 Hz.
-    const xr = roll === 0 ? x1 : x1 * cr - y1 * sr;
-    const yr = roll === 0 ? y1 : x1 * sr + y1 * cr;
+    const xr = roll === 0 ? xo : xo * cr - yo * sr;
+    const yr = roll === 0 ? yo : xo * sr + yo * cr;
     out[0] = cx + xr * scale;
     out[1] = cy - yr * scale;
-    out[2] = z2;
+    // Depth comes from AFTER the orientation, or the painter's far-to-near
+    // sort would order the dots by where they used to be.
+    out[2] = zo;
   };
 }
 
