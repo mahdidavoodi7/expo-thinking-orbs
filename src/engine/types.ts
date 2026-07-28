@@ -7,6 +7,8 @@
 // and a `build` worklet that runs each frame on the UI thread, filling a
 // structure-of-arrays dot buffer — no captures beyond its parameters.
 
+import type { Mat3 } from './core';
+
 import type { DotBuffer } from './scratch';
 import type { ModeOpts } from './profiles';
 
@@ -66,6 +68,20 @@ export interface ModeDynamics {
    * projection and does not touch depth.
    */
   roll: number;
+  /**
+   * The globe's own orientation, applied to each point BEFORE `yaw`,
+   * `pitch` and `roll`. `null` when nothing is driving it.
+   *
+   * This is the difference between turning the globe and turning the
+   * camera. The three angles above are camera-side — the mode's idle spin
+   * and the device's parallax — and they compose by addition because each
+   * is a small independent nudge about a fixed axis. An orientation cannot
+   * work that way: adding Euler angles is not composing rotations, so a
+   * caller wanting "spin the globe about whatever axis this force implies,
+   * from wherever it currently is" has no way to express it through them.
+   * A matrix does, and it costs nine multiplies per dot only when supplied.
+   */
+  orient: Mat3 | null;
 }
 
 /**

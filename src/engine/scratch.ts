@@ -10,6 +10,7 @@
 // inside one invocation, so a shared buffer can never interleave between
 // orbs.
 
+import type { Mat3 } from './core';
 import type { ModeDynamics } from './types';
 
 /**
@@ -42,6 +43,27 @@ export interface DotBuffer {
 interface ScratchGlobal {
   __expoThinkingOrbsScratch?: DotBuffer;
   __expoThinkingOrbsDyn?: ModeDynamics;
+  __expoThinkingOrbsMat?: number[];
+}
+
+/**
+ * Return the runtime's shared 3x3 scratch, for a caller building an
+ * orientation matrix once per frame. Reused for the same reason as
+ * everything else here: a frame should allocate the picture and nothing else.
+ *
+ * Its contents are only valid until the next call, which is safe for the
+ * same reason {@linkcode acquireDotBuffer} is — one build/record pass
+ * completes atomically before the runtime yields.
+ */
+export function acquireMat3(): number[] {
+  'worklet';
+  const g = globalThis as ScratchGlobal;
+  let m = g.__expoThinkingOrbsMat;
+  if (m === undefined) {
+    m = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    g.__expoThinkingOrbsMat = m;
+  }
+  return m;
 }
 
 /**
@@ -56,13 +78,14 @@ export function acquireDynamics(
   mix: number,
   yaw: number = 0,
   pitch: number = 0,
-  roll: number = 0
+  roll: number = 0,
+  orient: Mat3 | null = null
 ): ModeDynamics {
   'worklet';
   const g = globalThis as ScratchGlobal;
   let d = g.__expoThinkingOrbsDyn;
   if (d === undefined) {
-    d = { amp, from, to, mix, yaw, pitch, roll };
+    d = { amp, from, to, mix, yaw, pitch, roll, orient };
     g.__expoThinkingOrbsDyn = d;
     return d;
   }
@@ -73,6 +96,7 @@ export function acquireDynamics(
   d.yaw = yaw;
   d.pitch = pitch;
   d.roll = roll;
+  d.orient = orient;
   return d;
 }
 

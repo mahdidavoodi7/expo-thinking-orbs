@@ -22,7 +22,12 @@ import {
 import { buildColorLUT } from './colors';
 import { recordPicture } from './engine/paint';
 import { MODES } from './engine/registry';
-import { acquireDotBuffer, acquireDynamics } from './engine/scratch';
+import { quatToMat3 } from './engine/core';
+import {
+  acquireDotBuffer,
+  acquireDynamics,
+  acquireMat3,
+} from './engine/scratch';
 import { applyVoicePass } from './engine/voice-pass';
 import type { VoiceBehaviour } from './engine/voice';
 import { pickDesignSize, resolvePreset, resolveVoicePreset } from './presets';
@@ -237,6 +242,14 @@ export function useThinkingOrbPicture({
   const yawSV = typeof tYaw === 'number' ? ownYawSV : tYaw;
   const pitchSV = typeof tPitch === 'number' ? ownPitchSV : tPitch;
   const rollSV = typeof tRoll === 'number' ? ownRollSV : tRoll;
+  // The globe's own orientation, if the caller is driving one. Always four
+  // shared values or nothing — unlike the angles above there is no plain
+  // number form, because a static orientation is just a different resting
+  // pose and the three angles already express that.
+  const qx = tilt?.orientation?.x;
+  const qy = tilt?.orientation?.y;
+  const qz = tilt?.orientation?.z;
+  const qw = tilt?.orientation?.w;
   const reduced = useReducedMotion();
 
   const effSpeed = resolved.speed * speed * (reduced ? REDUCED_SPEED : 1);
@@ -394,7 +407,18 @@ export function useThinkingOrbPicture({
       mix.get(),
       reduced || yawSV == null ? 0 : yawSV.get(),
       reduced || pitchSV == null ? 0 : pitchSV.get(),
-      reduced || rollSV == null ? 0 : rollSV.get()
+      reduced || rollSV == null ? 0 : rollSV.get(),
+      // Orientation SURVIVES reduced motion, where the three angles above do
+      // not, and the difference is who caused it. Those are ambient: the
+      // device moves and the globe answers, unbidden, which is the motion the
+      // setting exists to remove. An orientation is where the user themselves
+      // put the ball. Zeroing it would not calm the interface, it would
+      // silently discard a direct manipulation — and the caller is expected to
+      // drop the coasting half itself, which is the part that keeps moving
+      // after the finger has gone.
+      qx == null || qy == null || qz == null || qw == null
+        ? null
+        : quatToMat3(qx.get(), qy.get(), qz.get(), qw.get(), acquireMat3())
     );
     build(buf, size, t, opts, staticData, dyn);
     // The voice pass runs on the BUILT cloud, which is what lets it apply

@@ -19,6 +19,71 @@ export type Projector = (
   out: Float32Array
 ) => void;
 
+/**
+ * A rotation, row-major: `[m00 m01 m02 m10 m11 m12 m20 m21 m22]`.
+ *
+ * Flat rather than nested so a caller can keep one reusable array and refill
+ * it each frame — the per-frame loops here allocate nothing per dot, and an
+ * orientation that allocated nine numbers per frame would be the only thing
+ * in the pipeline that did.
+ */
+export type Mat3 = readonly number[];
+
+/**
+ * Build a rotation matrix from a unit quaternion, once per frame.
+ *
+ * Callers hold orientation as a quaternion because that is the form that
+ * integrates cleanly — composing two rotations is a multiply, and the result
+ * can be renormalised in four operations, where matrices drift out of
+ * orthonormality and Euler angles cannot represent "turn about an arbitrary
+ * axis" at all. Rendering wants a matrix, though, so the conversion happens
+ * here: once per frame, never per dot.
+ *
+ * `out` is filled in place for the same allocation reason as `Projector`.
+ */
+export function quatToMat3(
+  x: number,
+  y: number,
+  z: number,
+  w: number,
+  out: number[]
+): Mat3 {
+  'worklet';
+  // Normalise on the way in. Long integrations accumulate error, and a
+  // quaternion that has drifted off the unit sphere renders as a shear —
+  // the orb would subtly stretch the longer you played with it.
+  const len = Math.sqrt(x * x + y * y + z * z + w * w);
+  const s = len === 0 ? 0 : 1 / len;
+  const qx = x * s;
+  const qy = y * s;
+  const qz = z * s;
+  const qw = w * s;
+
+  const x2 = qx + qx;
+  const y2 = qy + qy;
+  const z2 = qz + qz;
+  const xx = qx * x2;
+  const xy = qx * y2;
+  const xz = qx * z2;
+  const yy = qy * y2;
+  const yz = qy * z2;
+  const zz = qz * z2;
+  const wx = qw * x2;
+  const wy = qw * y2;
+  const wz = qw * z2;
+
+  out[0] = 1 - (yy + zz);
+  out[1] = xy - wz;
+  out[2] = xz + wy;
+  out[3] = xy + wz;
+  out[4] = 1 - (xx + zz);
+  out[5] = yz - wx;
+  out[6] = xz - wy;
+  out[7] = yz + wx;
+  out[8] = 1 - (xx + yy);
+  return out;
+}
+
 /** Deterministic hash in [0, 1). */
 export function hashD(a: number, b: number): number {
   'worklet';
@@ -57,6 +122,13 @@ export function angleDelta(a: number, b: number): number {
  *
  * `roll` leaves `z` alone — a rotation about the view axis cannot change
  * depth — so the painter's z-sort is unaffected.
+ *
+ * An optional `orient` rotates the model point BEFORE any of the above, so a
+ * caller can hand the globe a real orientation — a ball in space, spun about
+ * whatever axis a force implies — while the three angles above keep their
+ * existing meanings on top of it: the engine's own idle spin, and a bounded
+ * view-space parallax. Adding Euler angles cannot express that; composing a
+ * rotation can.
  */
 export function makeProj(
   yaw: number,
@@ -64,7 +136,8 @@ export function makeProj(
   cx: number,
   cy: number,
   scale: number,
-  roll: number = 0
+  roll: number = 0,
+  orient: Mat3 | null = null
 ): Projector {
   'worklet';
   const st = Math.sin(tilt);
@@ -73,7 +146,25 @@ export function makeProj(
   const cyw = Math.cos(yaw);
   const sr = Math.sin(roll);
   const cr = Math.cos(roll);
-  return (x, y, z, out) => {
+  // Hoisted so the hot path reads locals rather than array slots, and so the
+  // null check happens once per frame instead of once per dot.
+  const m00 = orient === null ? 0 : orient[0];
+  const m01 = orient === null ? 0 : orient[1];
+  const m02 = orient === null ? 0 : orient[2];
+  const m10 = orient === null ? 0 : orient[3];
+  const m11 = orient === null ? 0 : orient[4];
+  const m12 = orient === null ? 0 : orient[5];
+  const m20 = orient === null ? 0 : orient[6];
+  const m21 = orient === null ? 0 : orient[7];
+  const m22 = orient === null ? 0 : orient[8];
+  return (x0, y0, z0, out) => {
+    // The orientation turns the BALL; everything below turns the camera and
+    // the engine's own idle spin around it. Skipped entirely when absent —
+    // nine multiplies per dot per frame is not free at 120 Hz, and the
+    // overwhelming majority of callers never pass one.
+    const x = orient === null ? x0 : m00 * x0 + m01 * y0 + m02 * z0;
+    const y = orient === null ? y0 : m10 * x0 + m11 * y0 + m12 * z0;
+    const z = orient === null ? z0 : m20 * x0 + m21 * y0 + m22 * z0;
     const x1 = x * cyw + z * sy;
     const z1 = -x * sy + z * cyw;
     const y1 = y * ct - z1 * st;
