@@ -13,7 +13,7 @@ const TAU = Math.PI * 2;
 
 const GESTURE_EPOCH = 9;
 const GESTURE_SPAN = 3.2;
-const GESTURE_COUNT = 3;
+const GESTURE_COUNT = 4;
 
 const hashD = (a: number, b: number) => {
   const h = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
@@ -135,6 +135,141 @@ const check = (name: string, ok: boolean, detail = '') => {
     'ripple front crosses the whole shell',
     frontAtEnd >= 2 - 1e-9,
     `front ${frontAtEnd} of max 2`
+  );
+}
+
+// 7. Idle's own clock is strictly increasing. It wanders — that is the point —
+//    but a tempo that reaches zero stalls the animation and a negative one runs
+//    it backwards, and both read as a bug rather than as life. Checked as a
+//    derivative bound and then sampled, because the bound is the thing that has
+//    to hold when someone edits the amplitudes.
+{
+  const A1 = 1.6;
+  const W1 = 0.211;
+  const A2 = 0.7;
+  const W2 = 0.0873;
+  const idleTime = (t: number) =>
+    t + A1 * Math.sin(t * W1) + A2 * Math.sin(t * W2 + 2.1);
+  const worstDrop = A1 * W1 + A2 * W2; // both derivatives fully against us
+  check(
+    'idle tempo never stalls or reverses',
+    worstDrop < 0.9,
+    `worst slowdown ${worstDrop.toFixed(3)} of 1.0`
+  );
+  let minRate = Infinity;
+  let maxRate = 0;
+  const dt = 1 / 120;
+  for (let t = 0; t < 4000; t += dt) {
+    const r = (idleTime(t + dt) - idleTime(t)) / dt;
+    minRate = Math.min(minRate, r);
+    maxRate = Math.max(maxRate, r);
+  }
+  check(
+    'sampled tempo stays positive',
+    minRate > 0.05,
+    `rate ranges ${minRate.toFixed(3)}–${maxRate.toFixed(3)}`
+  );
+  console.log(
+    `      (tempo swings ${(minRate * 100).toFixed(0)}%–${(maxRate * 100).toFixed(0)}% of nominal)`
+  );
+}
+
+// 8. The differential twist stays bounded. `shear` is interpolated by the blend
+//    spine, so a term carrying `t` linearly would differ by tens of radians late
+//    in a session and whip the shell round on the next state change. Everything
+//    in it must be a sine, and the total has to stay a twist rather than a
+//    shredding.
+{
+  const worst = 0.085 + 0.05 + 0.035 + 0.16; /* twist gust */
+  const deg = (worst * 180) / Math.PI;
+  check(
+    'twist stays bounded and sane',
+    worst < 0.45,
+    `max ${worst.toFixed(3)} rad (${deg.toFixed(1)}°)`
+  );
+}
+
+// 9. The swarm's contraction returns to exactly 1. A gesture that left the shell
+//    even slightly smaller would accumulate across a session.
+{
+  const HIVE_SQUASH = 0.05;
+  const squash = (env: number) => 1 - HIVE_SQUASH * env;
+  check(
+    'swarm squash returns to full size',
+    squash(0) === 1 && squash(1) === 1 - HIVE_SQUASH,
+    `at rest ${squash(0)}, deepest ${squash(1).toFixed(3)}`
+  );
+}
+
+// 10. The BODY stays inside the canvas. This is the real budget for the float,
+//     the breath, the wobble and the hop: the picture is recorded at
+//     `(0, 0, size, size)` and the shell already reaches 0.874 of the half-size,
+//     so everything below has to fit in the remaining ~12%. Dots that fall
+//     outside are simply clipped, with no warning and nothing in a screenshot to
+//     show which frame lost them.
+{
+  const SHELL = 0.874; // of the half-size
+  const RF_CEILING = 0.985;
+  const BODY_BOB_A1 = 0.015;
+  const BODY_BOB_W1 = 0.31;
+  const BODY_BOB_A2 = 0.007;
+  const BODY_BOB_W2 = 0.1971;
+  const BODY_WOBBLE = 0.55;
+  const BODY_WOBBLE_MAX = 0.038;
+  const HOP_HEIGHT = 0.026;
+  const HOP_BOUNCES = 1.5;
+  const HOP_DEFORM = 0.055;
+
+  // Worst case, every term against us at once: the float and the hop at full
+  // height, the body stretched as far as the clamp allows, and the shell at its
+  // ceiling. The breath is deliberately absent — it only ever shrinks the body,
+  // so counting it would flatter the result.
+  const bobMax = BODY_BOB_A1 + BODY_BOB_A2 + HOP_HEIGHT; // fraction of size
+  const halfExtent = SHELL * RF_CEILING * (1 + BODY_WOBBLE_MAX); // of half-size
+  // bob is in units of size, extent in units of half-size — convert.
+  const worst = halfExtent + bobMax * 2;
+  check(
+    'body stays inside the canvas',
+    worst <= 1,
+    `worst reach ${(worst * 100).toFixed(1)}% of the half-size`
+  );
+
+  // The wobble clamp has to actually bind, or a fast passage could stretch the
+  // body arbitrarily — it is driven by a velocity, not a bounded position.
+  const velMax =
+    BODY_BOB_A1 * BODY_BOB_W1 +
+    BODY_BOB_A2 * BODY_BOB_W2 +
+    HOP_HEIGHT * TAU * HOP_BOUNCES * HOP_DEFORM * 12;
+  check(
+    'wobble is clamped, not merely small',
+    BODY_WOBBLE * velMax > BODY_WOBBLE_MAX,
+    `unclamped peak ${(BODY_WOBBLE * velMax).toFixed(4)} vs clamp ${BODY_WOBBLE_MAX}`
+  );
+}
+
+// 11. The hop begins and ends on the ground. `gEnv` is zero at both ends of a
+//     gesture, so this holds by construction — but the shape must not leave the
+//     body mid-air at the moment the envelope closes either, or the last frames
+//     of the gesture would sink rather than land.
+{
+  const HOP_BOUNCES = 1.5;
+  const at = (u: number) =>
+    (0.5 - 0.5 * Math.cos(TAU * u)) * -Math.sin(TAU * u * HOP_BOUNCES);
+  const settled = Math.abs(at(0)) < 1e-9 && Math.abs(at(1)) < 1e-9;
+  // ...and it should spend most of the gesture above the ground, not below it:
+  // a hop is a leap, not a dip.
+  let up = 0;
+  let down = 0;
+  for (let i = 1; i < 1000; i++) {
+    const v = at(i / 1000);
+    if (v > 0) up += v;
+    else down -= v;
+  }
+  check('hop starts and lands on the ground', settled);
+  check(
+    'hop leaps more than it dips',
+    up > down * 1.2,
+    `up ${up.toFixed(1)} vs down ${down.toFixed(1)}`
   );
 }
 

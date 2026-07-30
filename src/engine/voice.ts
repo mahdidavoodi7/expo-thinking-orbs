@@ -143,10 +143,62 @@ const GESTURE_EPOCH = 9;
 /** How long a gesture takes. The rest of the epoch is quiet. */
 const GESTURE_SPAN = 3.2;
 /** How many gestures are in the rotation. */
-const GESTURE_COUNT = 3;
+const GESTURE_COUNT = 4;
 const GESTURE_RIPPLE = 0;
 const GESTURE_TWIST = 1;
 const GESTURE_SIGH = 2;
+const GESTURE_HOP = 3;
+
+// --- idle's BODY -------------------------------------------------------
+//
+// Everything above deforms the surface. This moves the whole thing, and it is
+// the half that makes an orb read as a creature rather than as a well-animated
+// texture: it floats, it breathes, it wobbles like something with mass, and now
+// and then it hops.
+//
+// Nothing else in this package translates or squashes a body — every other mode
+// deforms a sphere that stays put, centred and perfectly round — so none of this
+// collides with an existing state's signature.
+//
+// The budget is the CANVAS, not the radius ceiling. The picture is recorded at
+// `(0, 0, size, size)` and the shell already reaches 0.874 of the half-size, so
+// bob + scale + stretch have to fit in what is left or dots clip at the edge.
+// `scripts/check-idle-gestures.ts` asserts the worst case stays inside.
+
+/** Float: two rates, so the drift never settles into a rhythm. In units of `size`. */
+const BODY_BOB_A1 = 0.015;
+const BODY_BOB_W1 = 0.31;
+const BODY_BOB_A2 = 0.007;
+const BODY_BOB_W2 = 0.1971;
+/** Breath: how far the whole body draws in. Never scales UP — see `bodyScale`. */
+const BODY_BREATH = 0.03;
+const BODY_BREATH_W = 0.24;
+/**
+ * Wobble: how strongly vertical motion turns into squash and stretch.
+ *
+ * Driven by the bob's VELOCITY rather than its position, which is what makes it
+ * read as mass rather than as a second wobble bolted on: rising and falling
+ * stretch the body along its travel, and the turnarounds — where velocity passes
+ * through zero — are where it is roundest. Same principle as the squash-and
+ * -stretch of hand-drawn animation, and the package has no other springy motion.
+ */
+const BODY_WOBBLE = 0.55;
+/** Ceiling on the stretch, so a fast passage cannot tear the body thin. */
+const BODY_WOBBLE_MAX = 0.038;
+
+/**
+ * The hop's height, in units of `size`.
+ *
+ * Small because the CANVAS is the budget, not taste: the shell already reaches
+ * 0.874 of the half-size and the picture is clipped at the box, so the float and
+ * the hop together get the ~10% that is left. A bigger leap has to come from the
+ * consumer moving the whole view, which has no such edge.
+ */
+const HOP_HEIGHT = 0.026;
+/** How many times it leaves the ground in one gesture. */
+const HOP_BOUNCES = 1.5;
+/** Squash on landing / stretch in flight, on top of the wobble. */
+const HOP_DEFORM = 0.055;
 
 // The hive ripple's shape. Amplitudes are deliberately small: this is a jostle
 // running through a colony, and a shell that visibly pulsed would outrank
@@ -162,6 +214,41 @@ const HIVE_CREST = 0.5;
 const HIVE_BEE_D = 0.06;
 /** The first move: sharper than the ripple it sets off, and very local. */
 const HIVE_BEE_LIFT = 0.017;
+/**
+ * How far the whole shell draws IN while a ripple crosses it.
+ *
+ * The gesture reads harder for it: the shell contracting under a front that is
+ * pushing outward is the same trick a body uses to make a flinch legible — the
+ * background moves the other way from the event. Purely a reduction, so it costs
+ * nothing against the radius ceiling.
+ */
+const HIVE_SQUASH = 0.05;
+
+// --- idle's tempo -------------------------------------------------------
+//
+// Idle keeps its own clock, which runs at a wandering rate: `IDLE_WARP_*` add a
+// BOUNDED offset to `t`, so the effective tempo is `1 + d/dt(offset)` — the
+// animation drifts faster and slower without ever running backwards or drifting
+// away from the real clock.
+//
+// Two incommensurate terms, so the tempo variation does not loop either. The
+// amplitudes are chosen so the summed derivative stays inside ±0.55: enough that
+// a slow stretch is plainly slower than a quick one, nowhere near the 1.0 that
+// would stall or reverse time. `scripts/check-idle-gestures.ts` asserts it.
+const IDLE_WARP_A1 = 1.6;
+const IDLE_WARP_W1 = 0.211;
+const IDLE_WARP_A2 = 0.7;
+const IDLE_WARP_W2 = 0.0873;
+
+/** Idle's own wandering clock. Bounded offset, strictly increasing. */
+function idleTime(t: number): number {
+  'worklet';
+  return (
+    t +
+    IDLE_WARP_A1 * Math.sin(t * IDLE_WARP_W1) +
+    IDLE_WARP_A2 * Math.sin(t * IDLE_WARP_W2 + 2.1)
+  );
+}
 
 /**
  * Which gesture is playing and how far into it, written into `out` as
@@ -419,10 +506,13 @@ function ringState(
   // as the two-sine version did. Without this the third term would widen the
   // swing as a side effect of adding variety, and every amplitude budgeted
   // against the radius ceiling below would be wrong.
+  // `ti`, not `t`: idle's own wandering clock, so the whole pose breathes,
+  // twists and turns at a tempo that drifts. See `idleTime`.
+  const ti = idleTime(t);
   const w =
-    (0.62 * Math.sin(t * 1.05 - ri * 0.52) +
-      0.38 * Math.sin(t * 0.635 + ri * 0.83) +
-      0.22 * Math.sin(t * 0.4271 + ri * 0.31)) /
+    (0.62 * Math.sin(ti * 1.05 - ri * 0.52) +
+      0.38 * Math.sin(ti * 0.635 + ri * 0.83) +
+      0.22 * Math.sin(ti * 0.4271 + ri * 0.31)) /
     1.22;
   // The breath, deepened from ±0.028 so it is legible next to the spin, and
   // SKEWED — squashed toward its own sign so the shell fills faster than it
@@ -449,8 +539,27 @@ function ringState(
   // BOUNDED, as this slot requires: an angle carrying `t` linearly would differ
   // by tens of radians late in a session and whip the shell round on the next
   // blend.
+  //
+  // THREE terms, and the point of them is that the rings do not agree. A single
+  // term gave every ring the same phase and the same direction, so the shell
+  // twisted as one piece and read as rigid however much it moved. Here the two
+  // main terms take their phase from the RING INDEX with opposite signs and
+  // incommensurate rates, so neighbouring rings are always somewhat out of step
+  // and the pattern never realigns; the third alternates SIGN with ring index
+  // (`sin(ri * 0.9)`), so bands of the shell creep against each other — some
+  // leading, some genuinely counter-drifting — the way shear layers move in a
+  // fluid.
+  //
+  // Phase from lattice position, never a per-dot hash: neighbours must still
+  // agree closely enough to read as a surface (rule 2 at the top of this file).
+  // Ring index is lattice position, so decoupling by ring is the strongest
+  // legitimate decoupling available.
   const eq = 1 - sinLat * sinLat;
-  out[2] = 0.1 * eq * Math.sin(t * 0.42 + 0.6 * sinLat);
+  out[2] =
+    eq *
+    (0.085 * Math.sin(ti * 0.42 + ri * 0.77) +
+      0.05 * Math.sin(ti * 0.2571 - ri * 1.31) +
+      0.035 * Math.sin(ri * 0.9) * Math.sin(ti * 0.1733));
   out[3] = 1;
 
   // ...and on top, one of idle's gestures. Only the two per-RING ones are
@@ -462,7 +571,7 @@ function ringState(
       // A gust through the twist: the differential shear briefly deepens and
       // runs the other way, like a breeze crossing a field. Rides the same
       // `cos²lat` profile as the base twist so it cannot tear at the poles.
-      out[2] -= env * 0.16 * eq * Math.sin(t * 0.29);
+      out[2] -= env * 0.16 * eq * Math.sin(ti * 0.29);
     } else if (which === GESTURE_SIGH) {
       // A sigh: one deep, slow breath. The swing roughly doubles for the
       // duration and the crest lifts with it, so the shell fills visibly and
@@ -536,6 +645,59 @@ export function buildVoice(
   // the work entirely rather than multiplying by zero per dot.
   const idleW =
     (from === VOICE_IDLE ? 1 - mix : 0) + (to === VOICE_IDLE ? mix : 0);
+  // --- idle's body: float, breath, wobble, hop ------------------------
+  //
+  // All of it on idle's own wandering clock, so the body drifts in tempo with
+  // the surface rather than beating against it, and all of it scaled by `idleW`
+  // so a call arrives at a body that is exactly centred and round.
+  const tb = idleTime(t);
+  // Position and VELOCITY of the float. The velocity is analytic — the
+  // derivative of the same two sines — because deriving it by differencing
+  // frames would make the wobble depend on frame rate.
+  let bob =
+    BODY_BOB_A1 * Math.sin(tb * BODY_BOB_W1) +
+    BODY_BOB_A2 * Math.sin(tb * BODY_BOB_W2 + 1.7);
+  let bobVel =
+    BODY_BOB_A1 * BODY_BOB_W1 * Math.cos(tb * BODY_BOB_W1) +
+    BODY_BOB_A2 * BODY_BOB_W2 * Math.cos(tb * BODY_BOB_W2 + 1.7);
+  // The breath, as a scale that only ever draws IN. Scaling a shell UP would
+  // push it toward the canvas edge for no visual gain — the eye reads the
+  // rhythm, not the absolute size.
+  let bodyScale = 1 - BODY_BREATH * (0.5 + 0.5 * Math.sin(tb * BODY_BREATH_W));
+
+  // The hop. Its shape is the one idiom nothing in this package uses: a real
+  // bounce, with the body stretching as it leaves and squashing as it lands.
+  // `gEnv` is a raised cosine, zero at both ends, so the hop is guaranteed to
+  // start and finish on the ground however it is tuned.
+  if (idleW > 0 && gEnv > 0 && gWhich === GESTURE_HOP) {
+    // NEGATIVE sine, and that sign is the whole gesture. The envelope peaks in
+    // the middle of the span, so the lobe that lands there is the one the eye
+    // reads as the movement: with the sign flipped that is the LEAP, and what
+    // falls either side of it becomes an anticipating dip before the jump and a
+    // squashing landing after it. The obvious sign gives a body that sinks in
+    // the middle of its own hop — measured, not guessed.
+    const hop = -Math.sin(TAU * gLocal * HOP_BOUNCES);
+    const hopVel = -TAU * HOP_BOUNCES * Math.cos(TAU * gLocal * HOP_BOUNCES);
+    bob += idleW * gEnv * HOP_HEIGHT * hop;
+    // Deliberately NOT scaled by the envelope's shape alone: the deformation
+    // follows the hop's own velocity, so it stretches on the way up, rounds at
+    // the apex, and squashes through the landing.
+    bobVel += idleW * gEnv * HOP_HEIGHT * hopVel * HOP_DEFORM * 12;
+    // Heaviest at the bottom of the arc — the body compressing under itself.
+    bodyScale -= idleW * gEnv * HOP_DEFORM * 0.35 * Math.max(0, -hop);
+  }
+
+  // Squash and stretch, from the velocity. Vertical travel stretches the body
+  // along its direction of motion and narrows it across — volume roughly
+  // preserved, which is what sells mass.
+  let stretch = idleW * BODY_WOBBLE * bobVel;
+  if (stretch > BODY_WOBBLE_MAX) stretch = BODY_WOBBLE_MAX;
+  else if (stretch < -BODY_WOBBLE_MAX) stretch = -BODY_WOBBLE_MAX;
+  const bodyX = bodyScale * (1 - stretch);
+  const bodyY = bodyScale * (1 + stretch);
+  // Screen y grows downward, so a POSITIVE bob has to subtract to float up.
+  const bodyCy = cy - idleW * bob * size;
+
   // --- the hive ripple, set up once per frame -------------------------
   //
   // One dot twitches and the disturbance travels out across the SURFACE, dying
@@ -556,6 +718,7 @@ export function buildVoice(
   // the other way.
   let front = 0;
   let hiveDecay = 0;
+  let hiveSquash = 1;
   if (hiving) {
     const k = Math.floor(t / GESTURE_EPOCH);
     oy = 2 * hashD(k, 11.13) - 1;
@@ -566,22 +729,37 @@ export function buildVoice(
     // Reaches the far side just as the envelope closes, so the front never has
     // to be cut off — it has already run out of surface.
     front = 1 - Math.cos(Math.PI * gLocal);
+    // The shell draws IN while the front travels out — see `HIVE_SQUASH`. Peaks
+    // with the envelope and returns with it, so the orb is exactly its normal
+    // size before and after.
+    hiveSquash = 1 - HIVE_SQUASH * idleW * gEnv;
     // ...and fades as it goes, the way a disturbance loses energy to the dots it
     // has already moved. `gEnv` alone would let the far side move as much as the
     // origin did, which reads as a pulse rather than a ripple.
     hiveDecay = idleW * gEnv * (1 - 0.75 * gLocal);
   }
-  // The spin BREATHES rather than ticking: a bounded wobble on the rate, and a
-  // slow wander of the axis, both scaled by `idleW` so only idle drifts.
+  // The spin no longer runs at one speed. Three bounded terms ride the
+  // accumulating base rate — the largest slow and wide — so the turn visibly
+  // gathers pace and eases off again. Their summed derivative stays well under
+  // the 0.18 base, so the shell never stalls or reverses: a spin that stops
+  // reads as a dropped frame rather than as life.
   //
-  // The deviation is bounded while the base `t * 0.18` accumulates, which is the
-  // rule this slot has always had — an accumulating extra term would differ by
-  // tens of radians late in a session and whip the shell round on the next blend.
+  // Bounded is the rule for anything added here, however small: an accumulating
+  // extra term would differ by tens of radians late in a session and whip the
+  // shell round on the next blend.
+  const spinDrift =
+    0.45 * Math.sin(t * 0.081) +
+    0.18 * Math.sin(t * 0.1913 + 0.7) +
+    0.06 * Math.sin(t * 0.27);
   const pt = makeProj(
-    t * 0.18 + idleW * 0.06 * Math.sin(t * 0.27) + dyn.yaw,
-    0.38 + idleW * 0.05 * Math.sin(t * 0.19 + 1.1) + dyn.pitch,
+    t * 0.18 + idleW * spinDrift + dyn.yaw,
+    // Two rates on the axis as well, so the pole traces a slow irregular path
+    // instead of rocking between two positions.
+    0.38 +
+      idleW * (0.05 * Math.sin(t * 0.19 + 1.1) + 0.025 * Math.sin(t * 0.0729)) +
+      dyn.pitch,
     cx,
-    cy,
+    bodyCy,
     1,
     dyn.roll + idleW * 0.03 * Math.sin(t * 0.13),
     dyn.orient
@@ -689,7 +867,12 @@ export function buildVoice(
       const uz = cosLat * sinLon[lj];
       pt(ux * cs + uz * sn, sinLat, -ux * sn + uz * cs, p);
       const dx = p[0] - cx;
-      const dy = p[1] - cy;
+      // Against `bodyCy`, NOT `cy`: the projection is centred on the floating
+      // body now, so this stays the offset of a UNIT vector. Measuring from the
+      // static centre would fold the float into the offset, and the ripple's
+      // screen radius below — which has to be read in the shell's own frame —
+      // would swell and shrink as the body drifted up and down.
+      const dy = p[1] - bodyCy;
       const dz = p[2];
 
       let dr = rf;
@@ -724,6 +907,10 @@ export function buildVoice(
           const kick = Math.sin(Math.PI * (gLocal / 0.2));
           dr += HIVE_BEE_LIFT * near * near * kick * idleW * gEnv;
         }
+        // ...and the whole shell contracts under all of it. Applied last so it
+        // scales the front's lift too: the front stays proportionally as strong
+        // as it was, against a body that has drawn in around it.
+        dr *= hiveSquash;
       }
       if (rippling) {
         // Distance from the centre of the disc, 0 at the middle and 1 at
@@ -753,14 +940,21 @@ export function buildVoice(
       }
       if (dr > RF_CEILING) dr = RF_CEILING;
       const rr = R * dr;
+      // The body's squash goes on HERE rather than into `dr`, because it is a
+      // screen-space deformation and `dr` is a radius factor the ceiling clamp
+      // above is expressed in. Two multiplies per dot, both hoisted.
+      const rx = rr * bodyX;
+      const ry = rr * bodyY;
 
       let depth = (dz + 1) / 2;
       if (depth < 0) depth = 0;
       else if (depth > 1) depth = 1;
 
       const j = buf.count++;
-      xs[j] = cx + dx * rr;
-      ys[j] = cy + dy * rr;
+      xs[j] = cx + dx * rx;
+      ys[j] = bodyCy + dy * ry;
+      // Depth stays UNSQUASHED: the squash is what the viewer sees, not a change
+      // to the shell's geometry, and scaling z would reorder the painter's sort.
       zs[j] = dz * rr;
       // The family coupling: a crest makes a dot bigger AND darker at the
       // same instant. Never one without the other.
