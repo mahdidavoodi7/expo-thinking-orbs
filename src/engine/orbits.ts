@@ -105,7 +105,11 @@ export function buildOrbits(
     dyn.roll,
     dyn.orient
   );
-  const rs = radiusScale(size, o.rsPow ?? 0.6);
+  // `dyn.rMul` folds in HERE rather than at each radius expression, so every
+  // radius this mode derives from `rs` — dots, ghosts, particles — carries it
+  // for free, and a mode cannot pick up a dot-weight knob for some of its marks
+  // and not others.
+  const rs = radiusScale(size, o.rsPow ?? 0.6) * dyn.rMul;
   const ghostR = (o.ghostR ?? 0.9) * rs;
   const ghostA = o.ghostA ?? 0.5;
   const partR = o.partR ?? 1.2;

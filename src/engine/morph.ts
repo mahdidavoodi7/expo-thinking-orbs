@@ -10,7 +10,12 @@
 // verbatim from the original, working in per-runtime scratch arrays so
 // a frame allocates nothing.
 
-import type { DotBuffer, ModeOpts, ModeStaticData } from './types';
+import type {
+  DotBuffer,
+  ModeDynamics,
+  ModeOpts,
+  ModeStaticData,
+} from './types';
 
 type Path = (f: number) => [number, number];
 
@@ -134,7 +139,11 @@ export function buildMorph(
   size: number,
   t: number,
   o: ModeOpts,
-  s: MorphData
+  s: MorphData,
+  // The only dynamics this mode reads. It has no rotation to add to and no audio
+  // response — the outline IS the animation — but dot weight is geometry-free, so
+  // it applies here like everywhere else.
+  dyn: ModeDynamics
 ): void {
   'worklet';
   const K = s.K;
@@ -172,7 +181,11 @@ export function buildMorph(
   const pulse = 1 + 0.02 * Math.sin(local * 3.1);
 
   const c2 = size / 2;
-  const rDot = Math.max(0.35, re * size);
+  // `dyn.rMul` scales the mark, NOT the floor. This mode's radius is linear in
+  // `size` (it never goes through `radiusScale`), so the floor is the only thing
+  // keeping the outline visible at small sizes — scaling it down alongside the
+  // multiplier would let a shrink erase the shape instead of thinning it.
+  const rDot = Math.max(0.35, re * size * dyn.rMul);
   const xs = buf.xs;
   const ys = buf.ys;
   const zs = buf.zs;

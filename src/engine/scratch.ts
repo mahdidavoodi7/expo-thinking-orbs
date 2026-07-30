@@ -79,13 +79,14 @@ export function acquireDynamics(
   yaw: number = 0,
   pitch: number = 0,
   roll: number = 0,
-  orient: Mat3 | null = null
+  orient: Mat3 | null = null,
+  rMul: number = 1
 ): ModeDynamics {
   'worklet';
   const g = globalThis as ScratchGlobal;
   let d = g.__expoThinkingOrbsDyn;
   if (d === undefined) {
-    d = { amp, from, to, mix, yaw, pitch, roll, orient };
+    d = { amp, from, to, mix, yaw, pitch, roll, orient, rMul };
     g.__expoThinkingOrbsDyn = d;
     return d;
   }
@@ -97,6 +98,7 @@ export function acquireDynamics(
   d.pitch = pitch;
   d.roll = roll;
   d.orient = orient;
+  d.rMul = rMul;
   return d;
 }
 
