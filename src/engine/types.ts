@@ -7,6 +7,8 @@
 // and a `build` worklet that runs each frame on the UI thread, filling a
 // structure-of-arrays dot buffer — no captures beyond its parameters.
 
+import type { Mat3 } from './core';
+
 import type { DotBuffer } from './scratch';
 import type { ModeOpts } from './profiles';
 
@@ -66,6 +68,24 @@ export interface ModeDynamics {
    * projection and does not touch depth.
    */
   roll: number;
+  /**
+   * The globe's own orientation, applied to each point AFTER `yaw` and
+   * `pitch` and before `roll` — that is, in the viewer's frame. `null` when
+   * nothing is driving it.
+   *
+   * The three angles above compose by addition because each is a small
+   * independent nudge about a fixed axis. An orientation cannot work that
+   * way: adding Euler angles is not composing rotations, so a caller wanting
+   * "spin the globe about whatever axis this force implies, from wherever it
+   * currently is" has no way to express it through them. A matrix does, and
+   * it costs nine multiplies per dot only when supplied.
+   *
+   * The placement is part of the contract, not an implementation detail:
+   * `yaw` carries the mode's idle spin, which grows with elapsed time, so
+   * applying the orientation first would conjugate the caller's axes by it
+   * and a steady request would drift into a different one and back.
+   */
+  orient: Mat3 | null;
 }
 
 /**

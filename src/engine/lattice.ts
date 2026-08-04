@@ -184,7 +184,8 @@ export function buildGlobe(
     cx,
     cy,
     radius,
-    dyn.roll
+    dyn.roll,
+    dyn.orient
   );
   // scan sweeps relative to the spin; scanMul scales that relative rate
   const scan = t * (spin + (1.7 - spin) * (o.scanMul ?? 1));
@@ -250,7 +251,8 @@ export function buildRubik(
     cx,
     cy,
     R,
-    dyn.roll
+    dyn.roll,
+    dyn.orient
   );
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const sc = solveCycle(t, s.moves.length, 0.42, 1.2);
@@ -340,7 +342,8 @@ export function buildWave(
     cx,
     cy,
     1,
-    dyn.roll
+    dyn.roll,
+    dyn.orient
   );
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const rBase = o.rBase ?? 0.6;

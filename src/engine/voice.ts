@@ -366,7 +366,8 @@ export function buildVoice(
     cx,
     cy,
     1,
-    dyn.roll
+    dyn.roll,
+    dyn.orient
   );
   const rs = radiusScale(size, o.rsPow ?? 0.6);
   const rBase = o.rBase ?? 0.6;

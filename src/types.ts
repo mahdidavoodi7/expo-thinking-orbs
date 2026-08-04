@@ -71,6 +71,33 @@ export interface OrbTilt {
    * `pitch` tips that pole away from you, and `roll` tips it left or right.
    */
   roll?: SharedValue<number> | number;
+  /**
+   * The globe's own orientation, as a unit quaternion. Optional; omit it and
+   * the globe behaves exactly as it always has.
+   *
+   * The three angles above are small independent nudges that compose by
+   * addition. This does not: it exists because addition cannot express what a
+   * caller needs to say when the globe is a free object — "turn it about
+   * whatever axis this force implies, starting from wherever it already is."
+   * Euler angles have no such composition; a quaternion does.
+   *
+   * Expressed in the VIEWER's frame: x to the right, y up, depth toward the
+   * eye. It is applied after the mode's own idle spin rather than before, so
+   * the axis you ask for is the axis you get — rotating the globe first would
+   * let that spin, which grows with elapsed time, conjugate your axes and turn
+   * a steady request into one that drifts.
+   *
+   * Four shared values rather than one object so the render loop reads
+   * scalars and builds its matrix once per frame. The caller owns the
+   * integration: this package renders an orientation, it does not simulate
+   * one.
+   */
+  orientation?: {
+    x: SharedValue<number>;
+    y: SharedValue<number>;
+    z: SharedValue<number>;
+    w: SharedValue<number>;
+  };
 }
 
 /** Props for the ThinkingOrb component. */
