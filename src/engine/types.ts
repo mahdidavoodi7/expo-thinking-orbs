@@ -86,6 +86,23 @@ export interface ModeDynamics {
    * and a steady request would drift into a different one and back.
    */
   orient: Mat3 | null;
+  /**
+   * Multiplier on every dot's rendered radius. `1` leaves a mode exactly as its
+   * profile tuned it.
+   *
+   * Separate from `size`, because the two do different things. `size` scales
+   * POSITIONS linearly but radii only as `(size / 300) ** rsPow` — sub-linear on
+   * purpose, so a big orb does not become a ball of touching blobs. The
+   * consequence is that growing an orb spreads its dots faster than it grows
+   * them, and past a point the mark reads too fine for the sphere it describes.
+   * This is the knob for that, independent of the geometry.
+   *
+   * Per-frame, and that is the whole point of it living here: profile options are
+   * resolved once per mount on the JS thread, while this record is rewritten
+   * every frame. So a caller can drive it from a shared value and animate an
+   * orb's dot weight without re-recording geometry or reallocating the surface.
+   */
+  rMul: number;
 }
 
 /**

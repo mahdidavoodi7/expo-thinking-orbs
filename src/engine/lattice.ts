@@ -189,7 +189,11 @@ export function buildGlobe(
   );
   // scan sweeps relative to the spin; scanMul scales that relative rate
   const scan = t * (spin + (1.7 - spin) * (o.scanMul ?? 1));
-  const rs = radiusScale(size, o.rsPow ?? 0.6);
+  // `dyn.rMul` folds in HERE rather than at each radius expression, so every
+  // radius this mode derives from `rs` — dots, ghosts, particles — carries it
+  // for free, and a mode cannot pick up a dot-weight knob for some of its marks
+  // and not others.
+  const rs = radiusScale(size, o.rsPow ?? 0.6) * dyn.rMul;
   const dimBase = o.dimBase ?? 1;
   const rBase = o.rBase ?? 0.6;
   const rDepth = o.rDepth ?? 1.7;
@@ -254,7 +258,11 @@ export function buildRubik(
     dyn.roll,
     dyn.orient
   );
-  const rs = radiusScale(size, o.rsPow ?? 0.6);
+  // `dyn.rMul` folds in HERE rather than at each radius expression, so every
+  // radius this mode derives from `rs` — dots, ghosts, particles — carries it
+  // for free, and a mode cannot pick up a dot-weight knob for some of its marks
+  // and not others.
+  const rs = radiusScale(size, o.rsPow ?? 0.6) * dyn.rMul;
   const sc = solveCycle(t, s.moves.length, 0.42, 1.2);
   const rBase = o.rBase ?? 0.6;
   const rDepth = o.rDepth ?? 1.7;
@@ -345,7 +353,11 @@ export function buildWave(
     dyn.roll,
     dyn.orient
   );
-  const rs = radiusScale(size, o.rsPow ?? 0.6);
+  // `dyn.rMul` folds in HERE rather than at each radius expression, so every
+  // radius this mode derives from `rs` — dots, ghosts, particles — carries it
+  // for free, and a mode cannot pick up a dot-weight knob for some of its marks
+  // and not others.
+  const rs = radiusScale(size, o.rsPow ?? 0.6) * dyn.rMul;
   const rBase = o.rBase ?? 0.6;
   const rDepth = o.rDepth ?? 1.7;
 

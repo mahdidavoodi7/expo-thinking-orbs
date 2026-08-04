@@ -192,6 +192,7 @@ export function useThinkingOrbPicture({
   bands,
   tilt,
   voice,
+  dotScale,
   debugFrameMs,
 }: UseThinkingOrbPictureOptions = {}): DerivedValue<SkPicture> {
   const designSize = pickDesignSize(size);
@@ -266,6 +267,15 @@ export function useThinkingOrbPicture({
     if (typeof amplitude === 'number') ownAmpSV.set(amplitude);
   }, [amplitude, ownAmpSV]);
   const ampSV = typeof amplitude === 'number' ? ownAmpSV : amplitude;
+
+  // Dot weight, same number-or-SharedValue handling. Seeded at 1 rather than 0:
+  // this one is a MULTIPLIER, so the neutral value is one, and a caller who
+  // never passes it must not have their dots collapse to the `rMin` floor.
+  const ownDotScaleSV = useSharedValue(1);
+  useEffect(() => {
+    if (typeof dotScale === 'number') ownDotScaleSV.set(dotScale);
+  }, [dotScale, ownDotScaleSV]);
+  const dotScaleSV = typeof dotScale === 'number' ? ownDotScaleSV : dotScale;
 
   // Same number-or-SharedValue handling for each band. Three own-values are
   // allocated unconditionally: hooks cannot be called per present band, and
@@ -383,6 +393,12 @@ export function useThinkingOrbPicture({
 
   return useDerivedValue(() => {
     const t = Math.max(0, phase.get());
+    // Dot weight for THIS frame. Floored just above zero rather than clamped to
+    // a design range: a caller animating it is free to choose the range, but a 0
+    // would make every dot vanish into the `rMin` floor and read as the orb
+    // having failed to draw.
+    const rMulRaw = dotScaleSV == null ? 1 : dotScaleSV.get();
+    const rMul = rMulRaw > 0.01 ? rMulRaw : 0.01;
     // High-res timer polyfilled on the UI runtime; read via globalThis so
     // no ambient `performance` global leaks into the published types.
     const perf = (globalThis as { performance?: { now(): number } })
@@ -418,7 +434,8 @@ export function useThinkingOrbPicture({
       // after the finger has gone.
       qx == null || qy == null || qz == null || qw == null
         ? null
-        : quatToMat3(qx.get(), qy.get(), qz.get(), qw.get(), acquireMat3())
+        : quatToMat3(qx.get(), qy.get(), qz.get(), qw.get(), acquireMat3()),
+      rMul
     );
     build(buf, size, t, opts, staticData, dyn);
     // The voice pass runs on the BUILT cloud, which is what lets it apply
@@ -470,7 +487,19 @@ export function useThinkingOrbPicture({
         shift = 0.5 + 0.5 * Math.sin((t * 2 * Math.PI * 1000) / colorCycleMs);
       }
     }
-    const pic = recordPicture(buf, size, lut, rMin, lutTo, shift, colorSpread);
+    // `rMin` rides `rMul` too. It is the floor the painter clamps every radius
+    // to, resolved on the JS thread from the profile — leave it fixed and a
+    // shrinking multiplier stops thinning the dots the moment they reach it,
+    // which looks like the animation sticking partway.
+    const pic = recordPicture(
+      buf,
+      size,
+      lut,
+      rMin * rMul,
+      lutTo,
+      shift,
+      colorSpread
+    );
     if (timed && perf && debugFrameMs != null) {
       debugFrameMs.set(perf.now() - t0);
     }

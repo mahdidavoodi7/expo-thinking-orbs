@@ -175,6 +175,27 @@ export interface ThinkingOrbProps {
    */
   size?: number;
 
+  /**
+   * Weight of the dots themselves — a multiplier on every dot's rendered
+   * radius, leaving positions, counts and spacing untouched.
+   *
+   * It exists because `size` deliberately does NOT scale those two together:
+   * positions scale linearly with `size`, radii only as `(size / 300) ** 0.6`,
+   * so that a large orb does not close up into a ball of touching blobs. Past a
+   * point the side effect shows — the dots spread faster than they grow, and the
+   * mark starts to read as too fine for the sphere it describes. Raise this to
+   * put the weight back; lower it for a wispier cloud.
+   *
+   * Animatable, and cheaply: pass a `SharedValue` and it is read once per frame
+   * on the UI thread, so dot weight can ride the same curve as a scale or a
+   * transition. Unlike `size` — fixed for the component's life, because it sets
+   * both the Canvas dimensions and the recorded picture bounds — this is free to
+   * move.
+   *
+   * @default 1
+   */
+  dotScale?: SharedValue<number> | number;
+
   /** Theme mode; `auto` follows the OS/app appearance. @default 'auto' */
   theme?: OrbTheme;
 

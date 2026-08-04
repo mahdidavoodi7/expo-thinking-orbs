@@ -164,6 +164,7 @@ Omit `color` for the faithful grayscale original. 🖤🤍
 | --- | --- | --- | --- |
 | `state` | `OrbState` | `'working'` | Which animation to show. |
 | `size` | `number` | `64` | Rendered size in points; any number. |
+| `dotScale` | `SharedValue<number> \| number` | `1` | Weight of the dots: a multiplier on each dot's radius, positions untouched. `size` scales radii sub-linearly (`(size/300) ** 0.6`) so a large orb does not close up — raise this when a big orb's mark reads too fine. Animatable per frame from a `SharedValue`. |
 | `theme` | `'auto' \| 'dark' \| 'light'` | `'auto'` | Palette; `auto` follows the OS appearance. |
 | `speed` | `number` | `1` | Multiplier on the preset's baked speed. |
 | `paused` | `boolean` | `false` | Freeze on the current frame (continues from the same pose on resume). |
