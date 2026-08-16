@@ -1,15 +1,25 @@
 # ✨ expo-thinking-orbs
 
-Dotted thinking‑orb loading indicators for AI & agent UIs — ten hand‑tuned
-animated states, a voice‑agent component that swells with the audio, all
-rendered entirely on the UI thread with
-[React Native Skia](https://shopify.github.io/react-native-skia/) and
-[Reanimated](https://docs.swmansion.com/react-native-reanimated/). For React
-Native and Expo.
+**AI thinking indicators and a voice‑agent orb for React Native and Expo.**
 
 [![npm](https://img.shields.io/npm/v/expo-thinking-orbs.svg)](https://www.npmjs.com/package/expo-thinking-orbs)
+[![npm downloads](https://img.shields.io/npm/dm/expo-thinking-orbs.svg)](https://www.npmjs.com/package/expo-thinking-orbs)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20Android-lightgrey.svg)
+[![guide](https://img.shields.io/badge/guide-motionary.dev-FEEB00.svg)](https://motionary.dev/blog/react-native-ai-loading-animation)
+
+`expo-thinking-orbs` gives an AI or agent UI something better than a spinner: a
+dotted orb that says *which kind of work is happening*. Six hand‑tuned
+animations cover thinking, searching, reasoning, listening, writing and
+forming, and a separate `<VoiceOrb>` covers a voice agent's whole session
+lifecycle while swelling with the actual audio. Everything is drawn entirely on
+the UI thread with
+[React Native Skia](https://shopify.github.io/react-native-skia/) and
+[Reanimated](https://docs.swmansion.com/react-native-reanimated/), so the
+animation holds its frame rate while your app streams tokens.
+
+There is a longer write‑up of the approach in the
+[React Native AI loading animation guide](https://motionary.dev/blog/react-native-ai-loading-animation).
 
 ## 🙏 Credit
 >
@@ -44,8 +54,21 @@ https://github.com/user-attachments/assets/f269ab22-ffab-4e1c-a525-c811e5236a9c
 | 🔷 `shaping` | forming | a dotted outline morphs circle → triangle → square |
 
 Building a **voice agent**? There is a seventh animation for that — a dot
-shell with five behaviours, on its own component. See
+shell with eight behaviours, on its own component. See
 [Voice agents](#-voice-agents).
+
+## Contents
+
+- [Installation](#-installation)
+- [Quick start](#-quick-start)
+- [States & sizes](#-states--sizes)
+- [Theme & color](#-theme--color)
+- [Props](#-props)
+- [Voice agents](#-voice-agents)
+- [Many orbs? Share one canvas](#-many-orbs-share-one-canvas)
+- [How it works](#-how-it-works)
+- [Accessibility](#-accessibility)
+- [FAQ](#-faq)
 
 ## 📦 Installation
 
@@ -169,11 +192,56 @@ Omit `color` for the faithful grayscale original. 🖤🤍
 | `speed` | `number` | `1` | Multiplier on the preset's baked speed. |
 | `paused` | `boolean` | `false` | Freeze on the current frame (continues from the same pose on resume). |
 | `color` | `string` | — | Optional tint; any RN color string. |
+| `colorTo` | `string` | — | A second ink endpoint. Supplying it turns `color` into a gradient the dots move along, and is what enables the colour animation below. |
+| `colorShift` | `SharedValue<number> \| number` | — | Where the cloud sits between `color` (0) and `colorTo` (1). Omit it and the orb drifts it from its own clock; pass a `SharedValue` to drive it from a gesture or scroll at frame rate. |
+| `colorSpread` | `number` | `0.6` | How far a dot's own depth offsets its blend, 0–1. At 0 the shell is one colour moving as a mass; higher fans near and far dots along the gradient. |
+| `colorCycleMs` | `number` | `9000` | Period of the built‑in colour drift. Ignored when `colorShift` is supplied. |
+| `bands` | `OrbBands` | — | Band‑split audio: `low` swells the shell, `mid` drives a travelling ripple, `high` darkens the ink. The one audio input the six ported animations respond to. |
+| `tilt` | `OrbTilt` | — | Rotate the orb as a globe (`yaw`/`pitch`/`roll` in radians, or a unit quaternion `orientation`). Enters the projection, so the far side genuinely turns into sight. |
 | `style` | `StyleProp<ViewStyle>` | — | Container style (size drives width/height). |
 | `accessibilityLabel` | `string` | per‑state (e.g. `"Working…"`) | Overrides the default label. |
 | `debugFrameMs` | `SharedValue<number>` | — | Instrumentation: the worklet writes each frame's build+record time here. |
 
 `OrbState` is `'working' | 'searching' | 'solving' | 'listening' | 'composing' | 'shaping'`.
+
+### Colour, audio and rotation
+
+Three of those deserve a line of their own, because they turn the orb from a
+fixed asset into something your app can drive.
+
+`colorTo` opens up gradient ink. With only `color` set the painter takes the
+original single‑ramp path verbatim; add a second endpoint and the dots move
+along a gradient, either on the orb's own slow clock or on a value you own:
+
+```tsx
+// Drifts between the two hues on its own, slowly.
+<ThinkingOrb state="composing" color="#3b82f6" colorTo="#a855f7" />
+
+// Or drive it yourself, per frame, with no React render.
+<ThinkingOrb color="#3b82f6" colorTo="#a855f7" colorShift={scrollProgress} />
+```
+
+`bands` is the audio input for the **six ported animations** — distinct from
+`<VoiceOrb>`'s amplitude, and useful when you want `working` or `composing` to
+follow a microphone without becoming the voice shell. `useVoiceLevels()`
+returns exactly this shape:
+
+```tsx
+const levels = useVoiceLevels();
+<ThinkingOrb state="composing" bands={levels} />;
+```
+
+`tilt` rotates the orb as a globe rather than skewing the finished picture. It
+enters the projection, so dots on the leading edge sweep out of sight and
+hidden ones come round — which is why a `rotateX` transform on the `View` does
+not look the same. Pass `yaw`/`pitch`/`roll` for small independent nudges, or
+an `orientation` quaternion when the globe is a free object being turned from
+wherever it already is:
+
+```tsx
+// Device tilt, a drag, a scroll offset — it is just an angle.
+<ThinkingOrb state="searching" tilt={{ yaw, pitch }} />
+```
 
 ## 🎙️ Voice agents
 
@@ -201,18 +269,20 @@ function AgentAvatar() {
 Using another SDK? The union is nine plain strings — map yours onto them, or
 reach for `<ThinkingOrb>` and the four lifecycle states directly.
 
-**The seven behaviours**
+**The eight behaviours**
 
-All seven act on one shared dot shell — a latitude-ring lattice, the same
-structure `wave` and `globe` use — at the same tempo and scale as the ported
-animations. Because the dot set is shared, a state change **blends**: the dots
-travel to their new behaviour over ~420 ms instead of cutting.
+Nine states map onto eight behaviours — `failed` reuses `disconnected`'s, but
+frozen. All eight act on one shared dot shell — a latitude-ring lattice, the
+same structure `wave` and `globe` use — at the same tempo and scale as the
+ported animations. Because the dot set is shared, a state change **blends**:
+the dots travel to their new behaviour over ~420 ms instead of cutting.
 
 | state | behaviour |
 | --- | --- |
 | `disconnected` | dim, drawn in, near-motionless; a faint ping crawls across and finds nothing |
 | `connecting` | fast spikes and hard shear, but faint — straining, not yet through |
 | `pre-connect-buffering` | a bright band sweeps pole to pole and back; fuller than `connecting` |
+| `failed` | `disconnected`'s shell, frozen on the current frame |
 | `initializing` | scattered dots assemble onto the shell in a rolling wave |
 | `idle` | the undulation at half tempo and a quarter depth — at rest, breathing |
 | `listening` | wavefronts **converge inward**, carrying dots toward the core with the mic |
@@ -369,6 +439,82 @@ example needs a **development build** (`expo run:*`) rather than Expo Go —
 though with matched SDK versions Expo Go may work for a quick look. On Android,
 also give the release variant a sanity check.
 
+## ❓ FAQ
+
+### How do you show an AI "thinking" indicator in React Native?
+
+Render `<ThinkingOrb state="working" />` and switch `state` as your agent
+changes what it is doing — `searching` while it hits a tool, `solving` while it
+reasons, `composing` while it streams a reply. The point of six animations
+rather than one spinner is that the shape tells the user *which* kind of work
+is happening, which is the thing a spinner cannot say. Every orb shares one
+clock, so several mounted at different times stay in mutual phase.
+
+### Does it work in Expo Go?
+
+Not reliably. React Native Skia, Reanimated and Worklets are all native, so the
+example app expects a development build (`npx expo run:ios` /
+`npx expo run:android`). With exactly matched SDK versions Expo Go may work for
+a quick look, but treat a dev build as the supported path.
+
+### Does it work with LiveKit?
+
+Yes, with no mapping table. `VoiceOrbState` is LiveKit's
+[`AgentState`](https://docs.livekit.io/reference/agents-js/types/agents.voice.AgentState.html)
+union verbatim, so the `state` from `useVoiceAssistant()` passes straight into
+`<VoiceOrb>`. Using another SDK is fine too — the union is nine plain strings,
+so map yours onto them.
+
+### How do I feed it real microphone audio?
+
+`useVoiceAmplitude()` owns a `SharedValue` the orb reads every frame, and
+setting it never re-renders React. Call `set(v)` for values already in 0–1
+(LiveKit's `useTrackVolume`, a VU meter), `setDb(db)` for dBFS metering
+(`expo-audio`, `expo-av`, `AVAudioRecorder`), or `setSamples(frames)` for raw
+PCM in −1..1. Feed a raw meter: levels are already smoothed on the UI thread
+with a 45 ms attack and 240 ms release, so pre-smoothing only adds lag.
+
+### Why does amplitude change the depth of the animation but not its speed?
+
+Because driving the rate from amplitude is frequency modulation, and it reads
+as vibration rather than as a voice. Audio level scales how deep a gesture
+goes; the tempo stays fixed at the ported animations' pace.
+
+### Is it expensive to render several orbs at once?
+
+Each `<ThinkingOrb>` mounts its own Skia `<Canvas>`, and every canvas is a
+separate native surface that Android composites each frame, so a screen full of
+small orbs will drop frames on mid-range devices. Use
+[`useThinkingOrbPicture`](#-many-orbs-share-one-canvas) to draw several into
+one shared canvas instead. A frame allocates essentially nothing — reused
+`Float32Array` buffers, one shared `Paint`, a 256-entry colour LUT — so the UI
+thread stays GC-quiet even with dozens mounted.
+
+### Why is the animation only running at 60fps on my iPhone Pro?
+
+iOS caps `CADisplayLink` at 60fps unless the app opts in. Set
+`CADisableMinimumFrameDuration` to `true` in `Info.plist` (or via
+`expo.ios.infoPlist` in `app.json`). This is an app-level setting the library
+cannot enable for you — see [120 Hz on ProMotion](#120-hz-on-promotion).
+
+### What happens with reduce motion enabled?
+
+The orb slows to a third of its pace rather than freezing, and the voice shell
+stops tracking speech. That is deliberate: `idle`, `listening` and `thinking`
+share a resting radius by design, so a fully frozen orb would lose the state
+distinction entirely. Reduced motion asks for less motion, not none. Use
+`paused` if you genuinely want a still orb.
+
+## More React Native components
+
+I build animated React Native and Expo components at
+**[motionary.dev](https://motionary.dev)** — this one is free and MIT, and the
+rest of the catalog is there.
+
+- [React Native component reference](https://motionary.dev/components) — free
+- [Browse the catalog](https://motionary.dev/animations)
+- [React Native AI loading animation guide](https://motionary.dev/blog/react-native-ai-loading-animation) — the longer write-up behind this package
+
 ## 📄 License
 
 MIT. Original thinking-orbs © Jakub Antalik; React Native port ©
@@ -378,3 +524,5 @@ MIT. Original thinking-orbs © Jakub Antalik; React Native port ©
 
 Made with 🤍 by [Mehdi Davoodi](https://motionary.dev) — more of my projects
 live at **[motionary.dev](https://motionary.dev)**.
+
+If this saved you an afternoon, a ⭐ on the repo helps more people find it.

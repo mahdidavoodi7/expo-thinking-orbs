@@ -1,7 +1,7 @@
 {
   "name": "expo-thinking-orbs",
   "version": "0.2.0",
-  "description": "Dotted thinking-orb loading animations for AI, agent & voice UIs — ten tuned states plus an amplitude-reactive voice orb, rendered on the UI thread with Skia + Reanimated, for React Native & Expo",
+  "description": "AI thinking indicator and voice agent orb for React Native and Expo. Six dotted loading animations plus an audio-reactive voice orb, drawn on the UI thread with Skia and Reanimated.",
   "main": "./lib/commonjs/index.js",
   "module": "./lib/module/index.js",
   "types": "./lib/typescript/commonjs/src/index.d.ts",
@@ -39,10 +39,22 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\""
   },
   "keywords": [
+    "ai-loading",
+    "thinking-indicator",
+    "loading-indicator",
+    "activity-indicator",
+    "voice-agent",
+    "voice-orb",
+    "ai-agent",
+    "livekit",
     "react-native",
     "expo",
+    "react-native-skia",
     "skia",
     "reanimated",
+    "react-native-animation",
+    "react-native-component",
+    "ui-components",
     "loader",
     "loading",
     "spinner",
@@ -52,7 +64,9 @@
     "llm",
     "thinking",
     "orb",
-    "dots"
+    "dots",
+    "ios",
+    "android"
   ],
   "repository": {
     "type": "git",
@@ -63,7 +77,7 @@
   "bugs": {
     "url": "https://github.com/mahdidavoodi7/expo-thinking-orbs/issues"
   },
-  "homepage": "https://github.com/mahdidavoodi7/expo-thinking-orbs#readme",
+  "homepage": "https://motionary.dev/blog/react-native-ai-loading-animation",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
