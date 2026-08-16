@@ -1,6 +1,6 @@
 {
   "name": "expo-thinking-orbs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "AI thinking indicator and voice agent orb for React Native and Expo. Six dotted loading animations plus an audio-reactive voice orb, drawn on the UI thread with Skia and Reanimated.",
   "main": "./lib/commonjs/index.js",
   "module": "./lib/module/index.js",
